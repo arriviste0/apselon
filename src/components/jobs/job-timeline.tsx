@@ -17,6 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '../ui/label';
 
 
 interface JobTimelineProps {
@@ -121,7 +123,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                                 <span>{assignedUser.name}</span>
                                 </div>
                             )}
-                            <DropdownMenu>
+                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
                                 </DropdownMenuTrigger>
@@ -149,7 +151,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                     </CardContent>
                 )}
                 {canUpdate && (
-                  <CardFooter className="flex justify-end gap-2">
+                  <CardFooter className="flex justify-end items-center gap-4">
                     {process.status === 'Pending' && (
                       <Button onClick={() => handleUpdateStatus(process, 'In Progress')}>
                         <Play className="mr-2 h-4 w-4" /> Start
@@ -157,12 +159,23 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                     )}
                     {process.status === 'In Progress' && (
                       <>
-                        <Button variant="destructive" onClick={() => handleUpdateStatus(process, 'Rejected')}>
+                        <Button variant="destructive" size="sm" onClick={() => handleUpdateStatus(process, 'Rejected')}>
                           <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
                         </Button>
-                        <Button variant="default" className="bg-green-600 hover:bg-green-700" onClick={() => handleUpdateStatus(process, 'Completed')}>
-                          <CheckCircle className="mr-2 h-4 w-4" /> Complete
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`complete-${process.id}`}
+                                onCheckedChange={(checked) => {
+                                if (checked) {
+                                    handleUpdateStatus(process, 'Completed');
+                                }
+                                }}
+                                checked={process.status === 'Completed'}
+                            />
+                            <Label htmlFor={`complete-${process.id}`} className="font-semibold text-green-600">
+                                Mark as Complete
+                            </Label>
+                        </div>
                       </>
                     )}
                   </CardFooter>

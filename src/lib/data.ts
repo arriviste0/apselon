@@ -6,12 +6,23 @@ const userAvatar = PlaceHolderImages.find(img => img.id === 'user-avatar-1')?.im
 
 let users: User[] = [
   { id: 'user-1', name: 'Admin User', role: 'admin', department: 'Management', avatarUrl: userAvatar },
-  { id: 'user-2', name: 'Alice (Design)', role: 'employee', department: 'Design', avatarUrl: userAvatar },
-  { id: 'user-3', name: 'Bob (Approval)', role: 'employee', department: 'Approval', avatarUrl: userAvatar },
-  { id: 'user-4', name: 'Charlie (Materials)', role: 'employee', department: 'Material Check', avatarUrl: userAvatar },
-  { id: 'user-5', name: 'David (Cutting)', role: 'employee', department: 'Cutting', avatarUrl: userAvatar },
-  { id: 'user-6', name: 'Eve (Machining)', role: 'employee', department: 'Machining', avatarUrl: userAvatar },
-  { id: 'user-7', name: 'Frank (Assembly)', role: 'employee', department: 'Assembly', avatarUrl: userAvatar },
+  { id: 'user-2', name: 'Alice', role: 'employee', department: 'Design', avatarUrl: userAvatar },
+  { id: 'user-3', name: 'Bob', role: 'employee', department: 'Approval', avatarUrl: userAvatar },
+  { id: 'user-4', name: 'Charlie', role: 'employee', department: 'Material Check', avatarUrl: userAvatar },
+  { id: 'user-5', name: 'David', role: 'employee', department: 'Cutting', avatarUrl: userAvatar },
+  { id: 'user-6', name: 'Eve', role: 'employee', department: 'Machining', avatarUrl: userAvatar },
+  { id: 'user-7', name: 'Frank', role: 'employee', department: 'Assembly', avatarUrl: userAvatar },
+  { id: 'user-8', name: 'Grace', role: 'employee', department: 'Quality Control (QC)', avatarUrl: userAvatar },
+  { id: 'user-9', name: 'Heidi', role: 'employee', department: 'Finishing', avatarUrl: userAvatar },
+  { id: 'user-10', name: 'Ivan', role: 'employee', department: 'Painting', avatarUrl: userAvatar },
+  { id: 'user-11', name: 'Judy', role: 'employee', department: 'Drying/Curing', avatarUrl: userAvatar },
+  { id: 'user-12', name: 'Mallory', role: 'employee', department: 'Final Assembly', avatarUrl: userAvatar },
+  { id: 'user-13', name: 'Niaj', role: 'employee', department: 'Final QC', avatarUrl: userAvatar },
+  { id: 'user-14', name: 'Olivia', role: 'employee', department: 'Labeling', avatarUrl: userAvatar },
+  { id: 'user-15', name: 'Peggy', role: 'employee', department: 'Packing', avatarUrl: userAvatar },
+  { id: 'user-16', name: 'Sybil', role: 'employee', department: 'Dispatch Prep', avatarUrl: userAvatar },
+  { id: 'user-17', name: 'Trent', role: 'employee', department: 'Documentation', avatarUrl: userAvatar },
+  { id: 'user-18', name: 'Walter', role: 'employee', department: 'Shipping', avatarUrl: userAvatar },
 ];
 
 let processes: Process[] = [
