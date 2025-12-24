@@ -52,6 +52,10 @@ const formSchema = z.object({
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
   priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
   dueDate: z.date({ required_error: 'A due date is required.' }),
+  pcbType: z.enum(['Single-Sided', 'Double-Sided', 'Multi-Layer']).default('Single-Sided'),
+  layers: z.coerce.number().optional(),
+  material: z.string().optional(),
+  thickness: z.coerce.number().optional(),
 });
 
 interface CreateJobDialogProps {
@@ -73,8 +77,14 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
       description: '',
       quantity: 1,
       priority: 'Medium',
+      pcbType: 'Single-Sided',
+      layers: 1,
+      material: 'FR-4',
+      thickness: 1.6,
     },
   });
+
+  const pcbType = form.watch('pcbType');
 
   const handleGenerateSuggestions = async () => {
     const values = form.getValues();
@@ -112,14 +122,18 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
+      // The action doesn't handle PCB fields yet, so we just pass the existing ones.
       const newJobWithProcesses = await createJobAction({
-          ...values,
+          customerName: values.customerName,
+          description: values.description,
+          quantity: values.quantity,
+          priority: values.priority,
           dueDate: format(values.dueDate, 'yyyy-MM-dd'),
       });
 
       toast({
         title: 'Success!',
-        description: `Job ${newJobWithProcesses.job.jobId.toUpperCase()} has been created.`,
+        description: `Job ${newJobWithProcesses.jobId.toUpperCase()} has been created.`,
       });
       onJobCreated(newJobWithProcesses);
       setOpen(false);
@@ -150,7 +164,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div className="space-y-4">
               <FormField
                 control={form.control}
@@ -255,6 +269,72 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   </FormItem>
                 )}
               />
+               <h3 className="text-md font-medium pt-2 border-b">PCB Details</h3>
+                <FormField
+                  control={form.control}
+                  name="pcbType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PCB Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select PCB Type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Single-Sided">Single-Sided</SelectItem>
+                          <SelectItem value="Double-Sided">Double-Sided</SelectItem>
+                          <SelectItem value="Multi-Layer">Multi-Layer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {pcbType === 'Multi-Layer' && (
+                  <FormField
+                    control={form.control}
+                    name="layers"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of Layers</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="e.g., 4" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="material"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Material</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., FR-4" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="thickness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Thickness (mm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="e.g., 1.6" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
             </div>
             <div className="space-y-4">
               <Button type="button" variant="outline" className="w-full" onClick={handleGenerateSuggestions} disabled={isSuggesting}>
@@ -310,3 +390,5 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     </Dialog>
   );
 }
+
+    
