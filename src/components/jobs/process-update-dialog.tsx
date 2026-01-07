@@ -67,20 +67,22 @@ export function ProcessUpdateDialog({
   const form = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-        quantityIn: updateInfo?.lastQuantity ?? 0,
+        quantityIn: 0,
         quantityOut: 0,
     }
   });
 
+  const isRework = React.useMemo(() => updateInfo?.newStatus === 'In Progress' && updateInfo.process.status !== 'Pending', [updateInfo]);
+
   React.useEffect(() => {
     if (updateInfo) {
       const defaultValues = {
-        quantityIn: updateInfo.prefillQuantities?.in ?? updateInfo.lastQuantity ?? 0,
-        quantityOut: updateInfo.prefillQuantities?.out ?? (updateInfo.newStatus === 'Completed' ? (updateInfo.lastQuantity ?? 0) : 0),
+        quantityIn: updateInfo.prefillQuantities?.in ?? (isRework ? 0 : updateInfo.lastQuantity ?? 0),
+        quantityOut: updateInfo.prefillQuantities?.out ?? (updateInfo.newStatus === 'Completed' && !isRework ? (updateInfo.lastQuantity ?? 0) : 0),
       };
       form.reset(defaultValues);
     }
-  }, [updateInfo, form]);
+  }, [updateInfo, form, isRework]);
 
 
   const handleSubmit = (values: FormSchemaType) => {
@@ -92,7 +94,6 @@ export function ProcessUpdateDialog({
   const isOpen = !!updateInfo;
   const processName = updateInfo?.processDef.processName;
   const status = updateInfo?.newStatus;
-  const isRework = status === 'In Progress';
 
   const getTitle = () => {
     if (isRework) return `Rework: ${processName}`;
@@ -100,7 +101,7 @@ export function ProcessUpdateDialog({
   }
 
   const getDescription = () => {
-    if (isRework) return `Log a rework for this process.`;
+    if (isRework) return `Log a rework for this process. The IN quantity is the number of pending items.`;
     return `Confirming status as `
   }
 
@@ -120,7 +121,16 @@ export function ProcessUpdateDialog({
              <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                    Previous process output was <span className="font-semibold">{updateInfo?.lastQuantity}</span> panels.
+                    Previous process output was <span className="font-semibold">{updateInfo?.lastQuantity}</span> panels. This has been pre-filled as the IN quantity.
+                </AlertDescription>
+            </Alert>
+        )}
+        
+        {isRework && (
+             <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                    You are reworking <span className="font-semibold">{updateInfo?.lastQuantity}</span> pending items.
                 </AlertDescription>
             </Alert>
         )}
@@ -136,7 +146,7 @@ export function ProcessUpdateDialog({
                     <FormItem>
                       <FormLabel>IN Quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" {...field} readOnly={isRework} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

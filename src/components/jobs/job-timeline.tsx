@@ -60,14 +60,26 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     // Store previous state for undo
     const previousProcessesState = [...jobProcesses];
 
-    // Optimistic update
-    const updatedProcess = {
+    let updatedProcess: JobProcess;
+
+    if (newStatus === 'In Progress' && process.status !== 'Pending') { // This is a Rework action
+      updatedProcess = {
         ...process,
-        status: newStatus,
-        endTime: newStatus !== 'In Progress' ? new Date().toISOString() : null,
         remarks: remarks[process.id] || process.remarks,
-        ...quantityData,
-    };
+        quantityIn: (process.quantityIn || 0) + (quantityData.quantityIn || 0),
+        quantityOut: (process.quantityOut || 0) + (quantityData.quantityOut || 0),
+        // Don't change status or times for rework
+      };
+    } else {
+       updatedProcess = {
+          ...process,
+          status: newStatus,
+          endTime: newStatus !== 'In Progress' ? new Date().toISOString() : null,
+          remarks: remarks[process.id] || process.remarks,
+          ...quantityData,
+      };
+    }
+
     onProcessUpdate(updatedProcess);
 
     try {
@@ -81,8 +93,8 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
         });
 
         toast({
-            title: `Process ${newStatus}`,
-            description: `${allProcesses.find(p => p.processId === process.processId)?.processName} marked as ${newStatus.toLowerCase()}.`,
+            title: `Process Updated`,
+            description: `${allProcesses.find(p => p.processId === process.processId)?.processName} has been updated.`,
             action: (
               <Button
                 variant="ghost"
@@ -142,9 +154,14 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     }
   }
 
-  const openUpdateDialog = (process: JobProcess, newStatus: 'Completed' | 'Rejected' | 'In Progress', prefillQuantities?: {in: number, out: number}) => {
+  const openUpdateDialog = (process: JobProcess, newStatus: 'Completed' | 'Rejected' | 'In Progress') => {
     const processDef = allProcesses.find(p => p.processId === process.processId);
     if (!processDef) return;
+    
+    const isRework = newStatus === 'In Progress' && process.status !== 'Pending';
+    const pendingQty = (typeof process.quantityIn === 'number' && typeof process.quantityOut === 'number') 
+      ? process.quantityIn - process.quantityOut 
+      : null;
 
     const previousProcessJob = jobProcesses
       .map(jp => ({ jp, pDef: allProcesses.find(p => p.processId === jp.processId)! }))
@@ -153,7 +170,8 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
       .map(({ jp }) => jp)
       .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
       
-    const lastQuantity = previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null;
+    const lastQuantity = isRework ? (pendingQty ?? 0) : (previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null);
+    const prefillQuantities = isRework ? { in: pendingQty ?? 0, out: 0 } : undefined;
 
     setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities });
   };
@@ -245,7 +263,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                   
                   <CardFooter className="flex justify-end items-center gap-4">
                      {(pendingQty ?? 0) > 0 && (
-                        <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
+                        <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress')}>
                             <RefreshCw className="mr-2 h-4 w-4" /> Rework
                         </Button>
                      )}
