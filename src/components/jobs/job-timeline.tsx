@@ -61,15 +61,25 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     const previousProcessesState = [...jobProcesses];
 
     let updatedProcess: JobProcess;
+    const isRework = newStatus === 'In Progress' && process.status !== 'Pending';
 
-    if (newStatus === 'In Progress' && process.status !== 'Pending') { // This is a Rework action
+    if (isRework) { // This is a Rework action
+      const newQuantityIn = (process.quantityIn || 0) + (quantityData.quantityIn || 0);
+      const newQuantityOut = (process.quantityOut || 0) + (quantityData.quantityOut || 0);
+      
       updatedProcess = {
         ...process,
         remarks: remarks[process.id] || process.remarks,
-        quantityIn: (process.quantityIn || 0) + (quantityData.quantityIn || 0),
-        quantityOut: (process.quantityOut || 0) + (quantityData.quantityOut || 0),
-        // Don't change status or times for rework
+        quantityIn: newQuantityIn,
+        quantityOut: newQuantityOut,
       };
+
+      // If rework makes quantities equal, mark as complete
+      if (newQuantityIn === newQuantityOut) {
+          updatedProcess.status = 'Completed';
+          updatedProcess.endTime = new Date().toISOString();
+      }
+
     } else {
        updatedProcess = {
           ...process,
@@ -86,10 +96,11 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
         await updateProcessStatusAction({
             jobId: jobId,
             processId: process.processId,
-            newStatus,
+            newStatus: updatedProcess.status, // Use potentially updated status
             remarks: remarks[process.id] || '',
             userId: currentUser.id,
-            ...quantityData
+            quantityIn: quantityData.quantityIn,
+            quantityOut: quantityData.quantityOut,
         });
 
         toast({
@@ -251,7 +262,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                         </div>
                       )}
 
-                      { (process.status === 'Completed' || process.status === 'Rejected') && (
+                      { (process.status !== 'Pending' && process.quantityIn !== null) && (
                         <div className='text-sm space-y-1 text-muted-foreground'>
                             {process.quantityIn !== null && <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>}
                             {process.quantityOut !== null && <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>}

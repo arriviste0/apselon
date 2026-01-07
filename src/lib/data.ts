@@ -187,3 +187,74 @@ export const addJobProcesses = async (processesData: JobProcess[]): Promise<void
     jobProcesses.push(...processesData);
     return Promise.resolve();
 };
+
+interface UpdateProcessData {
+    newStatus: JobProcessStatus;
+    remarks?: string;
+    userId: string;
+    quantityIn?: number;
+    quantityOut?: number;
+}
+export const updateJobProcess = async (jobId: string, processId: string, data: UpdateProcessData): Promise<JobProcess> => {
+    const processIndex = jobProcesses.findIndex(p => p.jobId === jobId && p.processId === processId);
+    if (processIndex === -1) {
+        throw new Error('Process not found');
+    }
+
+    const currentProcess = jobProcesses[processIndex];
+    const isRework = data.newStatus === 'In Progress' && currentProcess.status !== 'Pending';
+
+    let updatedProcess: JobProcess;
+
+    if (isRework) {
+        const newQuantityIn = (currentProcess.quantityIn || 0) + (data.quantityIn || 0);
+        const newQuantityOut = (currentProcess.quantityOut || 0) + (data.quantityOut || 0);
+        
+        updatedProcess = {
+            ...currentProcess,
+            remarks: data.remarks || currentProcess.remarks,
+            quantityIn: newQuantityIn,
+            quantityOut: newQuantityOut,
+        };
+
+        if (newQuantityIn === newQuantityOut) {
+            updatedProcess.status = 'Completed';
+            updatedProcess.endTime = new Date().toISOString();
+        }
+    } else {
+        updatedProcess = {
+            ...currentProcess,
+            status: data.newStatus,
+            endTime: data.newStatus !== 'In Progress' ? new Date().toISOString() : currentProcess.endTime,
+            startTime: data.newStatus === 'In Progress' && !currentProcess.startTime ? new Date().toISOString() : currentProcess.startTime,
+            remarks: data.remarks || currentProcess.remarks,
+            assignedTo: data.userId,
+        };
+        if (data.quantityIn !== undefined) updatedProcess.quantityIn = data.quantityIn;
+        if (data.quantityOut !== undefined) updatedProcess.quantityOut = data.quantityOut;
+    }
+    
+    jobProcesses[processIndex] = updatedProcess;
+    
+    // If a process was completed, start the next one
+    if (updatedProcess.status === 'Completed') {
+        const processDef = processes.find(p => p.processId === processId);
+        if (processDef) {
+            const nextProcessDef = processes.find(p => p.sequenceNumber === processDef.sequenceNumber + 1);
+            if (nextProcessDef) {
+                const nextProcessIndex = jobProcesses.findIndex(p => p.jobId === jobId && p.processId === nextProcessDef.processId);
+                if (nextProcessIndex > -1 && jobProcesses[nextProcessIndex].status === 'Pending') {
+                    jobProcesses[nextProcessIndex] = {
+                        ...jobProcesses[nextProcessIndex],
+                        status: 'In Progress',
+                        startTime: new Date().toISOString(),
+                        assignedTo: data.userId, // Or determine based on department
+                        quantityIn: updatedProcess.quantityOut,
+                    };
+                }
+            }
+        }
+    }
+    
+    return Promise.resolve(updatedProcess);
+};

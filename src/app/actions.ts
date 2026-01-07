@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob, restoreJob } from '@/lib/data';
+import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob, restoreJob, updateJobProcess } from '@/lib/data';
 import { Job, JobWithProcesses, JobProcess } from '@/lib/types';
 
 export async function createJobAction(data: Job): Promise<JobWithProcesses> {
@@ -54,27 +54,15 @@ export async function restoreJobAction(job: JobWithProcesses): Promise<void> {
 interface UpdateProcessStatusData {
     jobId: string;
     processId: string;
-    newStatus: 'Completed' | 'Rejected' | 'In Progress';
+    newStatus: 'Completed' | 'Rejected' | 'In Progress' | 'Pending';
     remarks?: string;
     userId: string;
-    launchedPanels?: number;
     quantityIn?: number;
     quantityOut?: number;
 }
 
 export async function updateProcessStatusAction(data: UpdateProcessStatusData) {
-    // This is where you would update your database.
-    // For this mock, we're not actually updating the state stored in memory
-    // as it will be reset on next request. The client will optimistically update.
-    console.log('Updating process status:', data);
-
-    // In a real app you would do something like:
-    // const jobProcess = await db.jobProcess.find(...)
-    // await db.jobProcess.update(...)
-    // if (data.newStatus === 'Completed') {
-    //   const nextProcess = await db.jobProcess.find(...)
-    //   if (nextProcess) await db.jobProcess.update({ where: { id: nextProcess.id }, data: { status: 'In Progress' }})
-    // }
+    await updateJobProcess(data.jobId, data.processId, data);
     
     revalidatePath(`/jobs/${data.jobId}`);
     revalidatePath('/');
