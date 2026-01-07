@@ -152,13 +152,11 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
       .map(p => jobProcesses.find(jp => jp.processId === p.processId))
       .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
       
-    const lastQuantity = previousProcess?.quantityOut ?? previousProcess?.launchedPanels ?? null;
+    const lastQuantity = previousProcess?.quantityOut ?? previousProcess?.launchedPanels ?? process.quantityIn ?? null;
 
     setUpdateInfo({ process, processDef, newStatus, lastQuantity });
   };
   
-  const qcProcesses = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
-
   return (
     <>
       <div className="relative pl-8">
@@ -172,8 +170,6 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
 
             const assignedUser = users.find((u) => u.id === process.assignedTo);
             const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
-            
-            const isQcProcess = qcProcesses.includes(processDef.processName);
 
             return (
               <div key={process.id} className="relative">
@@ -233,14 +229,8 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
 
                       { (process.status === 'Completed' || process.status === 'Rejected') && (
                         <div className='text-sm space-y-1 text-muted-foreground'>
-                          {isQcProcess ? (
-                            <>
-                              <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>
-                              <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>
-                            </>
-                          ) : (
-                            <p>Launched Panels: <span className='font-medium text-foreground'>{process.launchedPanels}</span></p>
-                          )}
+                            <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>
+                            <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>
                         </div>
                       )}
                     </div>

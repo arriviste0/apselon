@@ -46,7 +46,14 @@ interface ProcessUpdateDialogProps {
   onRemarksChange: (remarks: string) => void;
 }
 
-const qcProcesses = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
+const formSchema = z.object({
+  quantityIn: z.coerce.number().min(0, 'Quantity cannot be negative.'),
+  quantityOut: z.coerce.number().min(0, 'Quantity cannot be negative.'),
+  launchedPanels: z.any().optional(), // No longer used in the form, but keep for submission data structure
+});
+
+type FormSchemaType = z.infer<typeof formSchema>;
+
 
 export function ProcessUpdateDialog({
   updateInfo,
@@ -55,51 +62,30 @@ export function ProcessUpdateDialog({
   remarks,
   onRemarksChange,
 }: ProcessUpdateDialogProps) {
-  const isQcProcess = qcProcesses.includes(updateInfo?.processDef.processName || '');
 
-  const formSchema = React.useMemo(() => {
-    return z.object({
-      launchedPanels: isQcProcess
-        ? z.any().optional()
-        : z.coerce.number().min(0, 'Quantity cannot be negative.'),
-      quantityIn: !isQcProcess
-        ? z.any().optional()
-        : z.coerce.number().min(0, 'Quantity cannot be negative.'),
-      quantityOut: !isQcProcess
-        ? z.any().optional()
-        : z.coerce.number().min(0, 'Quantity cannot be negative.'),
-    });
-  }, [isQcProcess]);
-
-  type FormSchemaType = z.infer<typeof formSchema>;
-  
   const form = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
-    defaultValues: isQcProcess ? {
+    defaultValues: {
         quantityIn: updateInfo?.lastQuantity ?? 0,
         quantityOut: 0,
-    } : {
-        launchedPanels: updateInfo?.lastQuantity ?? 0,
     }
   });
 
   React.useEffect(() => {
     if (updateInfo) {
-      const defaultValues = isQcProcess ? {
+      const defaultValues = {
         quantityIn: updateInfo.lastQuantity ?? 0,
-        quantityOut: 0,
-      } : {
-        launchedPanels: updateInfo.lastQuantity ?? 0,
+        quantityOut: updateInfo.newStatus === 'Completed' ? (updateInfo.lastQuantity ?? 0) : 0,
       };
       form.reset(defaultValues);
     }
-  }, [updateInfo, isQcProcess, form]);
+  }, [updateInfo, form]);
 
 
   const handleSubmit = (values: FormSchemaType) => {
     if (!updateInfo) return;
     const { process, newStatus } = updateInfo;
-    onSubmit(process, newStatus, values);
+    onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
   };
   
   const isOpen = !!updateInfo;
@@ -128,42 +114,13 @@ export function ProcessUpdateDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="space-y-4">
-              {isQcProcess ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="quantityIn"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IN Quantity</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="quantityOut"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>OUT Quantity</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ) : (
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="launchedPanels"
+                  name="quantityIn"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantity of Launched Panel</FormLabel>
+                      <FormLabel>IN Quantity</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
@@ -171,18 +128,31 @@ export function ProcessUpdateDialog({
                     </FormItem>
                   )}
                 />
-              )}
+                <FormField
+                  control={form.control}
+                  name="quantityOut"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>OUT Quantity</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
-                <FormItem>
-                    <FormLabel>Remarks / Notes</FormLabel>
-                    <FormControl>
-                        <Textarea 
-                            placeholder="Add remarks or issue notes..." 
-                            value={remarks}
-                            onChange={(e) => onRemarksChange(e.target.value)}
-                        />
-                    </FormControl>
-                </FormItem>
+              <FormItem>
+                  <FormLabel>Remarks / Notes</FormLabel>
+                  <FormControl>
+                      <Textarea 
+                          placeholder="Add remarks or issue notes..." 
+                          value={remarks}
+                          onChange={(e) => onRemarksChange(e.target.value)}
+                      />
+                  </FormControl>
+              </FormItem>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
