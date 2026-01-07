@@ -243,20 +243,19 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                     </div>
                   </CardContent>
                   
-                  {canUpdate && (
-                    <CardFooter className="flex justify-end items-center gap-4">
-                      {process.status === 'Pending' && (
+                  <CardFooter className="flex justify-end items-center gap-4">
+                     {(pendingQty ?? 0) > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Rework
+                        </Button>
+                     )}
+                     {canUpdate && process.status === 'Pending' && (
                         <Button onClick={() => handleStartProcess(process)}>
                           <Play className="mr-2 h-4 w-4" /> Start
                         </Button>
                       )}
-                      {process.status === 'In Progress' && (
+                      {canUpdate && process.status === 'In Progress' && (
                         <>
-                           {(pendingQty ?? 0) > 0 && (
-                             <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
-                                <RefreshCw className="mr-2 h-4 w-4" /> Rework
-                             </Button>
-                           )}
                           <Button variant="destructive" size="sm" onClick={() => openUpdateDialog(process, 'Rejected')}>
                             <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
                           </Button>
@@ -276,8 +275,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                           </div>
                         </>
                       )}
-                    </CardFooter>
-                  )}
+                  </CardFooter>
                 </Card>
               </div>
             );
