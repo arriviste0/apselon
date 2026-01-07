@@ -59,7 +59,7 @@ import {
 
 const formSchema = z.object({
   isRepeat: z.boolean().default(false),
-  layerType: z.enum(['Single', 'Double']).default('Double'),
+  layerType: z.string().default('Double Layer (D/S)'),
   jobId: z.string().min(1, 'Job No. is required'),
   refNo: z.string().optional(),
   customerName: z.string().min(1, 'Customer name is required'),
@@ -104,6 +104,8 @@ const formSchema = z.object({
   supplyInfo: z.string().optional(),
   description: z.string().optional(),
   priority: z.enum(['Low', 'Medium', 'High', 'Urgent']).default('Medium'),
+  testingRequired: z.string().optional(),
+  preparedBy: z.string().optional(),
 });
 
 interface CreateJobDialogProps {
@@ -133,13 +135,13 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     resolver: zodResolver(formSchema),
     defaultValues: {
         isRepeat: false,
-        layerType: 'Double',
+        layerType: 'Double Layer (D/S)',
         jobId: "",
         refNo: "",
         customerName: "",
         leadTime: "",
         partNo: "",
-        poNo: "",
+        poNo: "WHATS APP",
         quantity: 0,
         launchedPcbs: 0,
         launchedPanels: 0,
@@ -155,8 +157,8 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         panelSizeWidth: 0,
         panelSizeHeight: 0,
         upsPanel: 0,
-        material: "D/S FR4",
-        copperWeight: "18/18",
+        material: "FR4",
+        copperWeight: "H/H (18/18)",
         thickness: 1.6,
         source: "Any",
         ink: "Any",
@@ -164,7 +166,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         solderMask: "GREEN",
         legendColour: "WHITE",
         legendSide: "BOTH",
-        surfaceFinish: "HAL",
+        surfaceFinish: "HASL",
         vGrooving: false,
         cutting: "M-Cutting",
         mTraceSetup: "SETUP",
@@ -176,6 +178,8 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         supplyInfo: "",
         description: "",
         priority: "Medium",
+        testingRequired: 'Normal BBT',
+        preparedBy: 'Ashutosh Vyas',
     },
   });
 
@@ -190,7 +194,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         form.reset({
             ...jobDataToCopy,
             isRepeat: true,
-            layerType: jobDataToCopy.layerType as 'Single' | 'Double',
+            layerType: jobDataToCopy.layerType,
             dueDate: new Date(),
             orderDate: new Date(),
             poNo: '',
@@ -297,28 +301,20 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 control={form.control}
                 name="layerType"
                 render={({ field }) => (
-                  <FormItem className="space-y-3">
+                  <FormItem>
                     <FormLabel>Number of Layers</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex items-center space-x-4"
-                      >
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="Single" />
-                          </FormControl>
-                          <FormLabel className="font-normal">Single Sided</FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-2 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="Double" />
-                          </FormControl>
-                          <FormLabel className="font-normal">Double Sided</FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select number of layers" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Single Layer (S/S)">Single Layer (S/S)</SelectItem>
+                        <SelectItem value="Double Layer (D/S)">Double Layer (D/S)</SelectItem>
+                        <SelectItem value="4 Layer">4 Layer</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
               )} />
@@ -402,7 +398,23 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   </FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="poNo" render={({ field }) => (
-                    <FormItem><FormLabel>P.O. No.</FormLabel><FormControl><Input placeholder="WHATSAPP" {...field} /></FormControl><FormMessage /></FormItem>
+                   <FormItem>
+                      <FormLabel>P.O. Number</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a P.O. type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="EMAIL">EMAIL</SelectItem>
+                          <SelectItem value="VERBAL">VERBAL</SelectItem>
+                          <SelectItem value="WHATS APP">WHATS APP</SelectItem>
+                          <SelectItem value="PO">PO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="orderDate" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Order Date</FormLabel><Popover><PopoverTrigger asChild><FormControl>
@@ -471,13 +483,54 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   <FormItem><FormLabel>Ups Panel</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="material" render={({ field }) => (
-                  <FormItem><FormLabel>Material</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                      <FormLabel>Material Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select material" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="FR4">FR4</SelectItem>
+                          <SelectItem value="CEM-1">CEM-1</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
               )} />
               <FormField control={form.control} name="copperWeight" render={({ field }) => (
-                  <FormItem><FormLabel>Copper wt</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                      <FormLabel>Copper Thickness (oz)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select copper thickness" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="H/H (18/18)">H/H (18/18)</SelectItem>
+                          <SelectItem value="1/1 (35/35)">1/1 (35/35)</SelectItem>
+                          <SelectItem value="1/0 (35/0)">1/0 (35/0)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
               )} />
               <FormField control={form.control} name="thickness" render={({ field }) => (
-                  <FormItem><FormLabel>Thickness mm</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>PCB Thickness</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={String(field.value)}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select thickness" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1.0">1.0 mm</SelectItem>
+                          <SelectItem value="1.2">1.2 mm</SelectItem>
+                          <SelectItem value="1.6">1.6 mm</SelectItem>
+                          <SelectItem value="2.0">2.0 mm</SelectItem>
+                          <SelectItem value="2.4">2.4 mm</SelectItem>
+                          <SelectItem value="3.2">3.2 mm</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
               )} />
                <FormField control={form.control} name="source" render={({ field }) => (
                   <FormItem><FormLabel>Source</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -494,16 +547,71 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
              <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Instructions & Planning</h3>
                 <FormField control={form.control} name="solderMask" render={({ field }) => (
-                  <FormItem><FormLabel>Solder Mask</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                      <FormLabel>Masking Colour</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="GREEN">GREEN</SelectItem>
+                          <SelectItem value="BLUE">BLUE</SelectItem>
+                          <SelectItem value="RED">RED</SelectItem>
+                          <SelectItem value="WHITE">WHITE</SelectItem>
+                          <SelectItem value="BLACK">BLACK</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                  <FormField control={form.control} name="legendColour" render={({ field }) => (
-                  <FormItem><FormLabel>Legend Colour</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                      <FormLabel>Legend Colour</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="WHITE">WHITE</SelectItem>
+                          <SelectItem value="BLACK">BLACK</SelectItem>
+                           <SelectItem value="NONE">NONE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                  <FormField control={form.control} name="legendSide" render={({ field }) => (
-                  <FormItem><FormLabel>Legend Side</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                      <FormLabel>Legend Side</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select side" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                           <SelectItem value="TOP">TOP</SelectItem>
+                           <SelectItem value="BOT">BOT</SelectItem>
+                           <SelectItem value="BOTH">BOTH</SelectItem>
+                           <SelectItem value="NONE">NONE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                  <FormField control={form.control} name="surfaceFinish" render={({ field }) => (
-                  <FormItem><FormLabel>Surface Finish</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                   <FormItem>
+                      <FormLabel>Surface Finish</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select finish" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="HASL">HASL</SelectItem>
+                          <SelectItem value="TIN">TIN</SelectItem>
+                          <SelectItem value="IMARSION GOLD(ENIG)">IMARSION GOLD(ENIG)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="vGrooving" render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>"V" Grooving</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
@@ -535,6 +643,50 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 <FormField control={form.control} name="oneP" render={({ field }) => (
                     <FormItem><FormLabel>1 P</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField
+                  control={form.control}
+                  name="testingRequired"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Testing Required</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select testing type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Flying Probe Testing">Flying Probe Testing</SelectItem>
+                          <SelectItem value="Normal BBT">Normal BBT</SelectItem>
+                          <SelectItem value="NONE">NONE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="preparedBy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prepared By</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select preparer" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Thakor Babuji">Thakor Babuji</SelectItem>
+                          <SelectItem value="Ashutosh Vyas">Ashutosh Vyas</SelectItem>
+                          <SelectItem value="Patel Siddhi">Patel Siddhi</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <h4 className="text-md font-semibold border-b pb-1 pt-2">CCL Cutting Plan</h4>
                 <div className="grid grid-cols-2 gap-4">

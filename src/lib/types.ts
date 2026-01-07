@@ -18,7 +18,7 @@ export interface Job {
   poNo: string;
   orderDate: string;
   isRepeat: boolean;
-  layerType: 'Single' | 'Double';
+  layerType: string;
   leadTime?: string;
   refNo?: string;
   launchedPcbs?: number;
@@ -57,6 +57,8 @@ export interface Job {
   dueDate: string;
   createdAt: string;
   status: JobStatus;
+  testingRequired?: string;
+  preparedBy?: string;
 }
 
 export interface Process {

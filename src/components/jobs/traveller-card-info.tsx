@@ -77,6 +77,8 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
                     <InfoItem label="Cutting" value={job.cutting} />
                     <InfoItem label="M Trace Setup" value={job.mTraceSetup} />
                     <InfoItem label="1 P" value={job.oneP} />
+                    <InfoItem label="Testing Required" value={job.testingRequired} />
+                    <InfoItem label="Prepared By" value={job.preparedBy} />
                 </div>
             </div>
              <div>
