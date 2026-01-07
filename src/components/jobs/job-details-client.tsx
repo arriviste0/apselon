@@ -6,6 +6,8 @@ import { JobTimeline } from './job-timeline';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInBusinessDays } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TravellerCardInfo } from './traveller-card-info';
 
 interface JobDetailsClientProps {
   job: Job;
@@ -57,42 +59,34 @@ export default function JobDetailsClient({
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <CardTitle className="text-2xl">{job.customerName} - Job {job.jobId.toUpperCase()}</CardTitle>
-              <CardDescription>{job.description}</CardDescription>
+              <CardTitle className="text-2xl">Job {job.jobId.toUpperCase()}</CardTitle>
+              <CardDescription>{job.customerName} - {job.partNo}</CardDescription>
             </div>
             <Badge variant={job.status === 'Overdue' ? 'destructive' : 'secondary'} className="text-sm">{job.status}</Badge>
           </div>
         </CardHeader>
-        <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                    <p className="text-muted-foreground">Quantity</p>
-                    <p className="font-medium">{job.quantity}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Priority</p>
-                    <p className="font-medium">{job.priority}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground">Due Date</p>
-                    <p className="font-medium">{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</p>
-                </div>
-                <div>
-                    <p className="text-muted-foreground">Days Left</p>
-                    <p className={`font-medium ${daysLeft < 0 ? 'text-destructive' : ''}`}>{daysLeft >= 0 ? `${daysLeft} days` : `Overdue by ${Math.abs(daysLeft)} days`}</p>
-                </div>
-            </div>
-        </CardContent>
       </Card>
+
+      <Tabs defaultValue="timeline">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="timeline">Process Timeline</TabsTrigger>
+          <TabsTrigger value="traveller-card">Traveller Card</TabsTrigger>
+        </TabsList>
+        <TabsContent value="timeline" className="mt-6">
+            <JobTimeline 
+                jobId={job.jobId}
+                jobProcesses={jobProcesses} 
+                allProcesses={allProcesses}
+                users={users} 
+                currentUser={currentUser}
+                onProcessUpdate={handleProcessUpdate}
+            />
+        </TabsContent>
+        <TabsContent value="traveller-card">
+            <TravellerCardInfo job={job} />
+        </TabsContent>
+      </Tabs>
       
-      <JobTimeline 
-        jobId={job.jobId}
-        jobProcesses={jobProcesses} 
-        allProcesses={allProcesses}
-        users={users} 
-        currentUser={currentUser}
-        onProcessUpdate={handleProcessUpdate}
-      />
     </div>
   );
 }

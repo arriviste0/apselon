@@ -2,36 +2,23 @@
 
 import { revalidatePath } from 'next/cache';
 import { addJob, addJobProcesses, getProcesses } from '@/lib/data';
-import { JobWithProcesses, JobProcess } from '@/lib/types';
+import { Job, JobWithProcesses, JobProcess } from '@/lib/types';
 
-interface CreateJobData {
-  customerName: string;
-  description: string;
-  quantity: number;
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  dueDate: string;
-}
-
-export async function createJobAction(data: CreateJobData): Promise<JobWithProcesses> {
+export async function createJobAction(data: Job): Promise<JobWithProcesses> {
   const job = await addJob(data);
   const processes = await getProcesses();
 
-  const jobProcesses: JobProcess[] = processes.map((p) => ({
+  const jobProcesses: JobProcess[] = processes.map((p, index) => ({
     id: `jp-${job.jobId}-${p.processId}`,
     jobId: job.jobId,
     processId: p.processId,
     assignedTo: null,
-    status: 'Pending',
-    startTime: null,
+    status: index === 0 ? 'In Progress' : 'Pending',
+    startTime: index === 0 ? new Date().toISOString() : null,
     endTime: null,
     remarks: null,
   }));
   
-  // Assign the first process
-  jobProcesses[0].status = 'In Progress';
-  jobProcesses[0].startTime = new Date().toISOString();
-
-
   await addJobProcesses(jobProcesses);
   
   revalidatePath('/');
