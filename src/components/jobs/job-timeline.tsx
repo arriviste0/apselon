@@ -170,6 +170,10 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
 
             const assignedUser = users.find((u) => u.id === process.assignedTo);
             const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
+            const pendingQty = (typeof process.quantityIn === 'number' && typeof process.quantityOut === 'number') 
+              ? process.quantityIn - process.quantityOut
+              : null;
+
 
             return (
               <div key={process.id} className="relative">
@@ -229,8 +233,9 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
 
                       { (process.status === 'Completed' || process.status === 'Rejected') && (
                         <div className='text-sm space-y-1 text-muted-foreground'>
-                            <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>
-                            <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>
+                            {process.quantityIn !== null && <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>}
+                            {process.quantityOut !== null && <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>}
+                            {pendingQty !== null && <p>Pending: <span className={`font-medium ${pendingQty > 0 ? 'text-destructive' : 'text-foreground'}`}>{pendingQty}</span></p>}
                         </div>
                       )}
                     </div>
