@@ -89,7 +89,6 @@ const formSchema = z.object({
   surfaceFinish: z.string().optional(),
   vGrooving: z.boolean().default(false),
   cutting: z.string().optional(),
-  routing: z.string().optional(),
   sheetSizeWidth: z.coerce.number().optional(),
   sheetSizeHeight: z.coerce.number().optional(),
   sheetUtilization: z.coerce.number().optional(),
@@ -147,7 +146,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         surfaceFinish: "HAL",
         vGrooving: false,
         cutting: "M-CUTTING",
-        routing: "ROUTING",
         sheetSizeWidth: 0,
         sheetSizeHeight: 0,
         sheetUtilization: 0,
@@ -390,12 +388,27 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 <FormField control={form.control} name="vGrooving" render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>"V" Grooving</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>
                 )} />
-                 <FormField control={form.control} name="cutting" render={({ field }) => (
-                  <FormItem><FormLabel>Cutting</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="routing" render={({ field }) => (
-                  <FormItem><FormLabel>Routing</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="cutting"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cutting</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a cutting method" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="M-Cutting">M-Cutting</SelectItem>
+                          <SelectItem value="Routing">Routing</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <h4 className="text-md font-semibold border-b pb-1 pt-2">CCL Cutting Plan</h4>
                 <div className="grid grid-cols-2 gap-4">

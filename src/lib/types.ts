@@ -47,7 +47,6 @@ export interface Job {
   surfaceFinish: string;
   vGrooving: boolean;
   cutting: string;
-  routing: string;
   sheetSizeWidth: number;
   sheetSizeHeight: number;
   sheetUtilization: number;

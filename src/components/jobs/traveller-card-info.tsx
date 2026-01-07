@@ -75,7 +75,6 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
                     <InfoItem label="Surface Finish" value={job.surfaceFinish} />
                     <InfoItem label="V Grooving" value={job.vGrooving ? 'YES' : 'NO'} />
                     <InfoItem label="Cutting" value={job.cutting} />
-                    <InfoItem label="Routing" value={job.routing} />
                 </div>
             </div>
              <div>

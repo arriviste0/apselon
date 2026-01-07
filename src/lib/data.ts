@@ -85,7 +85,6 @@ let jobs: Job[] = [
     surfaceFinish: "HAL",
     vGrooving: true,
     cutting: "M-CUTTING",
-    routing: "ROUTING",
     sheetSizeWidth: 1040,
     sheetSizeHeight: 1240,
     sheetUtilization: 94,
