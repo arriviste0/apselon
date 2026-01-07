@@ -36,20 +36,9 @@ export function MainSidebar() {
             <Link href="/" passHref>
               <SidebarMenuButton
                 isActive={pathname === '/'}
-                tooltip="Dashboard"
+                tooltip="All Jobs"
               >
                 <LayoutDashboard />
-                Dashboard
-              </SidebarMenuButton>
-            </Link>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <Link href="/jobs" passHref>
-              <SidebarMenuButton
-                isActive={pathname.startsWith('/jobs')}
-                tooltip="Jobs"
-              >
-                <Briefcase />
                 All Jobs
               </SidebarMenuButton>
             </Link>
