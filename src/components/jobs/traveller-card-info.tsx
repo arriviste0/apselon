@@ -2,7 +2,9 @@
 
 import { Job } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
+import { Printer } from 'lucide-react';
 
 interface TravellerCardInfoProps {
   job: Job;
@@ -16,10 +18,18 @@ const InfoItem = ({ label, value, className }: { label: string, value: React.Rea
 );
 
 export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Traveller Card Details</CardTitle>
+        <Button onClick={handlePrint} variant="outline" size="sm" className="flex items-center space-x-1">
+          <Printer className="h-4 w-4" />
+          <span>Print</span>
+        </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6">
@@ -77,6 +87,7 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
                     <InfoItem label="V Grooving" value={job.vGrooving ? 'YES' : 'NO'} />
                     <InfoItem label="Cutting" value={job.cutting} />
                     <InfoItem label="M Trace Setup" value={job.mTraceSetup} />
+                    <InfoItem label="Setup" value={job.setup} />
                     <InfoItem label="1 P" value={job.oneP} />
                     <InfoItem label="Testing Required" value={job.testingRequired} />
                     <InfoItem label="Prepared By" value={job.preparedBy} />

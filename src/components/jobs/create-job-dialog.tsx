@@ -31,13 +31,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { CalendarIcon, PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { User, Process, JobWithProcesses, Job } from '@/lib/types';
@@ -46,27 +40,19 @@ import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
 import { ScrollArea } from '../ui/scroll-area';
 import { getJobs } from '@/lib/data';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 
 
 const formSchema = z.object({
   isRepeat: z.boolean().default(false),
   layerType: z.string().default('Double Layer (D/S)'),
-  jobId: z.string().min(1, 'Job No. is required'),
+  jobId: z.string().trim().min(1, 'Job No. is required'),
   refNo: z.string().optional(),
   customerName: z.string().min(1, 'Customer name is required'),
   leadTime: z.string().optional(),
   partNo: z.string().min(1, 'Part No. is required'),
-  dueDate: z.date({ required_error: 'A due date is required.' }),
+  dueDate: z.string().min(1, 'A due date is required.'),
   poNo: z.string().min(1, 'P.O. No. is required'),
-  orderDate: z.date({ required_error: 'An order date is required.' }),
+  orderDate: z.string().min(1, 'An order date is required.'),
   quantity: z.coerce.number().min(1, 'Order quantity must be at least 1'),
   launchedPcbs: z.coerce.number().optional(),
   launchedPanels: z.coerce.number().optional(),
@@ -97,6 +83,7 @@ const formSchema = z.object({
   cutting: z.string().optional(),
   mTraceSetup: z.string().optional(),
   oneP: z.string().optional(),
+  setup: z.string().optional(),
   sheetSizeWidth: z.coerce.number().optional(),
   sheetSizeHeight: z.coerce.number().optional(),
   sheetUtilization: z.coerce.number().optional(),
@@ -129,8 +116,6 @@ export function CreateJobDialog({
 }: CreateJobDialogProps) {
   const { toast } = useToast();
   const [allJobs, setAllJobs] = React.useState<Job[]>([]);
-  const [comboboxOpen, setComboboxOpen] = React.useState(false);
-  const [selectedJobId, setSelectedJobId] = React.useState('');
   
   const isEditing = !!jobToEdit;
 
@@ -183,6 +168,7 @@ export function CreateJobDialog({
         cutting: "M-Cutting",
         mTraceSetup: "SETUP",
         oneP: "",
+        setup: "",
         sheetSizeWidth: 0,
         sheetSizeHeight: 0,
         sheetUtilization: 0,
@@ -192,16 +178,16 @@ export function CreateJobDialog({
         priority: "Medium" as const,
         testingRequired: 'Normal BBT',
         preparedBy: 'Ashutosh Vyas',
-        dueDate: new Date(),
-        orderDate: new Date(),
+        dueDate: format(new Date(), 'yyyy-MM-dd'),
+        orderDate: format(new Date(), 'yyyy-MM-dd'),
     };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: isEditing ? {
         ...jobToEdit,
-        dueDate: parseISO(jobToEdit!.dueDate),
-        orderDate: parseISO(jobToEdit!.orderDate),
+        dueDate: format(parseISO(jobToEdit!.dueDate), 'yyyy-MM-dd'),
+        orderDate: format(parseISO(jobToEdit!.orderDate), 'yyyy-MM-dd'),
     } : defaultFormValues,
   });
   
@@ -209,8 +195,8 @@ export function CreateJobDialog({
     if (isEditing && jobToEdit) {
         form.reset({
             ...jobToEdit,
-            dueDate: parseISO(jobToEdit.dueDate),
-            orderDate: parseISO(jobToEdit.orderDate),
+            dueDate: format(parseISO(jobToEdit.dueDate), 'yyyy-MM-dd'),
+            orderDate: format(parseISO(jobToEdit.orderDate), 'yyyy-MM-dd'),
         });
     } else {
         form.reset(defaultFormValues);
@@ -223,13 +209,13 @@ export function CreateJobDialog({
     const foundJob = allJobs.find(job => job.jobId === jobId);
 
     if (foundJob) {
-        const { 
-            createdAt, 
+        const {
+            createdAt,
             status,
-            // Fields to be cleared/reset
+            jobId,
             leadTime,
-            dueDate,
             poNo,
+            dueDate,
             orderDate,
             quantity,
             launchedPcbs,
@@ -237,29 +223,18 @@ export function CreateJobDialog({
             launchedPcbSqm,
             launchedPanelSqm,
             // Keep the rest
-            ...jobDataToCopy 
+            ...jobDataToCopy
         } = foundJob;
-        
+
         form.reset({
             ...jobDataToCopy,
             isRepeat: true,
-            // Reset fields that should be re-entered
-            leadTime: "",
-            dueDate: new Date(),
-            poNo: "WHATS APP",
-            orderDate: new Date(),
-            quantity: 0,
-            launchedPcbs: 0,
-            launchedPanels: 0,
-            launchedPcbSqm: 0,
-            launchedPanelSqm: 0,
-            mTraceSetup: "", // Reset this field
-            oneP: "", // Reset this field
+            jobId: "", // Reset jobId for new repeat job
+            dueDate: format(new Date(), 'yyyy-MM-dd'), // Reset to current date
+            orderDate: format(new Date(), 'yyyy-MM-dd'), // Reset to current date
         });
 
         toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
-        setSelectedJobId(jobId);
-        setComboboxOpen(false);
     }
   };
 
@@ -270,8 +245,6 @@ export function CreateJobDialog({
           const updatedJob: JobWithProcesses = {
             ...jobToEdit!,
             ...values,
-            dueDate: format(values.dueDate, 'yyyy-MM-dd'),
-            orderDate: format(values.orderDate, 'yyyy-MM-dd'),
           };
           onJobUpdated(updatedJob);
           toast({
@@ -281,8 +254,6 @@ export function CreateJobDialog({
       } else {
         const jobData: Job = {
             ...values,
-            dueDate: format(values.dueDate, 'yyyy-MM-dd'),
-            orderDate: format(values.orderDate, 'yyyy-MM-dd'),
             createdAt: new Date().toISOString(),
             status: 'In Progress',
         };
@@ -297,7 +268,6 @@ export function CreateJobDialog({
       
       onOpenChange(false);
       form.reset(defaultFormValues);
-      setSelectedJobId('');
     } catch (error) {
         toast({
             title: 'Error',
@@ -307,7 +277,6 @@ export function CreateJobDialog({
     }
   }
   
-  const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
 
   const dialogTitle = isEditing ? `Edit Job ${jobToEdit?.jobId.toUpperCase()}` : 'Create New Job (Traveller Card)';
   const dialogDescription = isEditing ? 'Update the details for this job.' : 'Fill in the details from the traveller card to create a new job.';
@@ -318,7 +287,6 @@ export function CreateJobDialog({
         onOpenChange(open);
         if (!open) {
             form.reset(defaultFormValues);
-            setSelectedJobId('');
         }
     }}>
       {!isEditing && (
@@ -354,7 +322,6 @@ export function CreateJobDialog({
                             field.onChange(checked);
                             if (!checked) {
                                 form.reset(defaultFormValues);
-                                setSelectedJobId('');
                             }
                         }}
                         disabled={isEditing}
@@ -390,49 +357,18 @@ export function CreateJobDialog({
             {isRepeatJob && !isEditing && (
                 <div className="p-4 border rounded-lg bg-muted/50">
                     <FormLabel>Find Existing Job to Copy</FormLabel>
-                     <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={comboboxOpen}
-                            className="w-full justify-between mt-2"
-                            >
-                            {selectedJobId && selectedJobDisplayValue
-                                ? `${selectedJobDisplayValue?.jobId.toUpperCase()} - ${selectedJobDisplayValue?.customerName} - ${selectedJobDisplayValue?.partNo}`
-                                : "Select job to copy..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                            <Command>
-                                <CommandInput placeholder="Search by Job No, Customer, or Part No..." />
-                                <CommandList>
-                                    <CommandEmpty>No job found.</CommandEmpty>
-                                    <CommandGroup>
-                                        {allJobs.map((job) => (
-                                        <CommandItem
-                                            key={job.jobId}
-                                            value={`${job.jobId} ${job.customerName} ${job.partNo}`}
-                                            onSelect={() => handleJobSelect(job.jobId)}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedJobId === job.jobId ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            <div className='flex flex-col'>
-                                                <span className='font-medium'>{job.jobId.toUpperCase()} - {job.partNo}</span>
-                                                <span className='text-sm text-muted-foreground'>{job.customerName}</span>
-                                            </div>
-                                        </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
+                    <Select onValueChange={handleJobSelect}>
+                        <SelectTrigger className="mt-2">
+                            <SelectValue placeholder="Select job to copy..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {allJobs.map((job) => (
+                                <SelectItem key={job.jobId} value={job.jobId}>
+                                    {job.jobId.toUpperCase()} - {job.customerName} - {job.partNo}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             )}
 
@@ -457,12 +393,7 @@ export function CreateJobDialog({
                     <FormItem><FormLabel>Part No.</FormLabel><FormControl><Input placeholder="LL502_R3" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel>Del Date</FormLabel><Popover><PopoverTrigger asChild><FormControl>
-                    <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}>
-                      {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Del Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="poNo" render={({ field }) => (
                    <FormItem>
@@ -484,12 +415,7 @@ export function CreateJobDialog({
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="orderDate" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel>Order Date</FormLabel><Popover><PopoverTrigger asChild><FormControl>
-                    <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}>
-                      {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Order Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="quantity" render={({ field }) => (
                     <FormItem><FormLabel>Order Qty</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
@@ -522,7 +448,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>PCB Width</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="pcbSizeHeight" render={({ field }) => (
-                  <FormItem><FormLabel>PCB Height</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>PCB Length</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -530,7 +456,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>Array Width</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="arraySizeHeight" render={({ field }) => (
-                  <FormItem><FormLabel>Array Height</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Array Length</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
                <div className="grid grid-cols-2 gap-4">
@@ -538,7 +464,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>Ups Array W</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="upsArrayHeight" render={({ field }) => (
-                  <FormItem><FormLabel>Ups Array H</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Ups Array L</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
                <div className="grid grid-cols-2 gap-4">
@@ -546,7 +472,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>Panel Width</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="panelSizeHeight" render={({ field }) => (
-                  <FormItem><FormLabel>Panel Height</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Panel Length</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
                <FormField control={form.control} name="upsPanel" render={({ field }) => (
@@ -709,6 +635,9 @@ export function CreateJobDialog({
                 />
                 <FormField control={form.control} name="mTraceSetup" render={({ field }) => (
                     <FormItem><FormLabel>M Trace Setup</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="setup" render={({ field }) => (
+                    <FormItem><FormLabel>Setup</FormLabel><FormControl><Input {...field} disabled={isRepeatJob} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="oneP" render={({ field }) => (
                     <FormItem><FormLabel>1 P</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

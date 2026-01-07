@@ -32,7 +32,7 @@ export interface ProcessUpdateInfo {
   processDef: Process;
   newStatus: 'Completed' | 'Rejected' | 'In Progress';
   lastQuantity: number | null;
-  prefillQuantities?: { in: number; out: number };
+  prefillQuantities?: { in: number; out: number } | { originalOut: number; pending: number };
 }
 
 interface ProcessUpdateDialogProps {
@@ -41,15 +41,17 @@ interface ProcessUpdateDialogProps {
   onSubmit: (
     process: JobProcess,
     newStatus: 'Completed' | 'Rejected' | 'In Progress',
-    quantityData: { launchedPanels?: number; quantityIn?: number; quantityOut?: number }
+    quantityData: { launchedPanels?: number; quantityIn?: number; quantityOut?: number; pending?: number }
   ) => void;
   remarks: string;
   onRemarksChange: (remarks: string) => void;
 }
 
 const formSchema = z.object({
-  quantityIn: z.coerce.number().min(0, 'Quantity cannot be negative.'),
-  quantityOut: z.coerce.number().min(0, 'Quantity cannot be negative.'),
+  quantityIn: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
+  quantityOut: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
+  originalOut: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
+  pending: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
   launchedPanels: z.any().optional(), // No longer used in the form, but keep for submission data structure
 });
 
@@ -69,6 +71,8 @@ export function ProcessUpdateDialog({
     defaultValues: {
         quantityIn: 0,
         quantityOut: 0,
+        originalOut: 0,
+        pending: 0,
     }
   });
 
@@ -76,9 +80,11 @@ export function ProcessUpdateDialog({
 
   React.useEffect(() => {
     if (updateInfo) {
-      const defaultValues = {
-        quantityIn: updateInfo.prefillQuantities?.in ?? (isRework ? 0 : updateInfo.lastQuantity ?? 0),
-        quantityOut: updateInfo.prefillQuantities?.out ?? (updateInfo.newStatus === 'Completed' && !isRework ? (updateInfo.lastQuantity ?? 0) : 0),
+      const defaultValues: FormSchemaType = {
+        quantityIn: updateInfo.prefillQuantities && 'in' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.in : (isRework ? 0 : updateInfo.lastQuantity ?? 0),
+        quantityOut: updateInfo.prefillQuantities && 'out' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.out : (updateInfo.newStatus === 'Completed' && !isRework ? (updateInfo.lastQuantity ?? 0) : (isRework ? (updateInfo.prefillQuantities && 'in' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.in : 0) : 0)),
+        originalOut: isRework && updateInfo.prefillQuantities && 'originalOut' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.originalOut : 0,
+        pending: isRework && updateInfo.prefillQuantities && 'pending' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.pending : 0,
       };
       form.reset(defaultValues);
     }
@@ -88,7 +94,11 @@ export function ProcessUpdateDialog({
   const handleSubmit = (values: FormSchemaType) => {
     if (!updateInfo) return;
     const { process, newStatus } = updateInfo;
-    onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
+    if (isRework) {
+      onSubmit(process, newStatus, { quantityOut: values.originalOut, pending: values.pending, launchedPanels: undefined });
+    } else {
+      onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
+    }
   };
   
   const isOpen = !!updateInfo;
@@ -127,45 +137,76 @@ export function ProcessUpdateDialog({
         )}
         
         {isRework && (
-             <Alert>
+              <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                    You are reworking <span className="font-semibold">{updateInfo?.lastQuantity}</span> pending items.
+                    Adjust the original OUT quantity and pending quantity for rework.
                 </AlertDescription>
-            </Alert>
+              </Alert>
         )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quantityIn"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>IN Quantity</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} readOnly={isRework} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="quantityOut"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>OUT Quantity</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {isRework ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="originalOut"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Original OUT Quantity</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="pending"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pending Quantity</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="quantityIn"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>IN Quantity</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} readOnly={isRework} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quantityOut"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>OUT Quantity</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
               
               <FormItem>
                   <FormLabel>Remarks / Notes</FormLabel>

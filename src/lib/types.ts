@@ -50,6 +50,7 @@ export interface Job {
   cutting?: string;
   mTraceSetup?: string;
   oneP?: string;
+  setup?: string;
   sheetSizeWidth?: number;
   sheetSizeHeight?: number;
   sheetUtilization?: number;
@@ -81,6 +82,8 @@ export interface JobProcess {
   remarks: string | null;
   quantityIn?: number | null;
   quantityOut?: number | null;
+  reworkQuantityIn?: number | null;
+  reworkQuantityOut?: number | null;
   launchedPanels?: number | null;
 }
 

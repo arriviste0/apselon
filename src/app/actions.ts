@@ -59,6 +59,8 @@ interface UpdateProcessStatusData {
     userId: string;
     quantityIn?: number;
     quantityOut?: number;
+    reworkQuantityIn?: number;
+    reworkQuantityOut?: number;
 }
 
 export async function updateProcessStatusAction(data: UpdateProcessStatusData) {
