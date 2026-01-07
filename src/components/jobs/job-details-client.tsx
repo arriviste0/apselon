@@ -26,30 +26,36 @@ export default function JobDetailsClient({
 }: JobDetailsClientProps) {
     const [jobProcesses, setJobProcesses] = React.useState(initialProcesses);
 
-    const handleProcessUpdate = (updatedProcess: JobProcess) => {
-        setJobProcesses(prevProcesses => {
-            const newProcesses = prevProcesses.map(p => p.id === updatedProcess.id ? updatedProcess : p);
-            // If a process was completed, start the next one
-            if(updatedProcess.status === 'Completed') {
-                const updatedProcessDetails = allProcesses.find(p => p.processId === updatedProcess.processId);
-                if (updatedProcessDetails) {
-                    const nextProcessDetails = allProcesses.find(p => p.sequenceNumber === updatedProcessDetails.sequenceNumber + 1);
-                    if (nextProcessDetails) {
-                        const nextJobProcessIndex = newProcesses.findIndex(p => p.processId === nextProcessDetails.processId);
-                        if (nextJobProcessIndex !== -1 && newProcesses[nextJobProcessIndex].status === 'Pending') {
-                            newProcesses[nextJobProcessIndex] = {
-                                ...newProcesses[nextJobProcessIndex],
-                                status: 'In Progress',
-                                startTime: new Date().toISOString(),
-                                assignedTo: currentUser.id, // Or logic to assign to next department
-                            };
-                        }
-                    }
-                }
-            }
-            return newProcesses;
-        });
-    }
+    const handleProcessUpdate = (update: JobProcess | JobProcess[]) => {
+      if (Array.isArray(update)) {
+        setJobProcesses(update);
+        return;
+      }
+      
+      const updatedProcess = update;
+      setJobProcesses(prevProcesses => {
+          const newProcesses = prevProcesses.map(p => p.id === updatedProcess.id ? updatedProcess : p);
+          // If a process was completed, start the next one
+          if(updatedProcess.status === 'Completed') {
+              const updatedProcessDetails = allProcesses.find(p => p.processId === updatedProcess.processId);
+              if (updatedProcessDetails) {
+                  const nextProcessDetails = allProcesses.find(p => p.sequenceNumber === updatedProcessDetails.sequenceNumber + 1);
+                  if (nextProcessDetails) {
+                      const nextJobProcessIndex = newProcesses.findIndex(p => p.processId === nextProcessDetails.processId);
+                      if (nextJobProcessIndex !== -1 && newProcesses[nextJobProcessIndex].status === 'Pending') {
+                          newProcesses[nextJobProcessIndex] = {
+                              ...newProcesses[nextJobProcessIndex],
+                              status: 'In Progress',
+                              startTime: new Date().toISOString(),
+                              assignedTo: currentUser.id, // Or logic to assign to next department
+                          };
+                      }
+                  }
+              }
+          }
+          return newProcesses;
+      });
+  }
 
   const daysLeft = differenceInBusinessDays(parseISO(job.dueDate), new Date());
 

@@ -27,7 +27,7 @@ interface JobTimelineProps {
   allProcesses: Process[];
   users: User[];
   currentUser: User;
-  onProcessUpdate: (updatedProcess: JobProcess) => void;
+  onProcessUpdate: (updatedProcess: JobProcess | JobProcess[]) => void;
 }
 
 const statusIcons = {
@@ -51,6 +51,10 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
   const handleUpdateStatus = async (process: JobProcess, newStatus: 'Completed' | 'Rejected' | 'In Progress') => {
     const remark = remarks[process.id] || '';
     
+    // Store previous state for undo
+    const previousProcessState = process;
+    const previousProcessesState = jobProcesses;
+
     // Optimistic update
     const updatedProcess = {
         ...process,
@@ -69,9 +73,24 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
             remarks: remark,
             userId: currentUser.id,
         });
+
         toast({
             title: `Process ${newStatus}`,
             description: `${allProcesses.find(p => p.processId === process.processId)?.processName} marked as ${newStatus.toLowerCase()}.`,
+            action: (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onProcessUpdate(previousProcessesState);
+                  toast({
+                    title: 'Undo successful',
+                    description: 'The process status has been reverted.',
+                  });
+                }}
+              >
+                Undo
+              </Button>
+            ),
         });
     } catch (error) {
         toast({
@@ -79,8 +98,8 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
             description: 'Could not update process status. Please try again.',
             variant: 'destructive',
         });
-        // Revert optimistic update on failure - in a real app, you'd fetch the true state
-        onProcessUpdate(process);
+        // Revert optimistic update on failure
+        onProcessUpdate(previousProcessState);
     }
   };
 
