@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob } from '@/lib/data';
+import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob, restoreJob } from '@/lib/data';
 import { Job, JobWithProcesses, JobProcess } from '@/lib/types';
 
 export async function createJobAction(data: Job): Promise<JobWithProcesses> {
@@ -34,11 +34,17 @@ export async function updateJobAction(data: Job): Promise<Job> {
     return job;
 }
 
-export async function deleteJobAction(jobId: string): Promise<{ success: boolean }> {
-    await deleteJob(jobId);
+export async function deleteJobAction(jobId: string): Promise<JobWithProcesses | null> {
+    const deletedJob = await deleteJob(jobId);
     revalidatePath('/');
     revalidatePath('/master');
-    return { success: true };
+    return deletedJob;
+}
+
+export async function restoreJobAction(job: JobWithProcesses): Promise<void> {
+    await restoreJob(job);
+    revalidatePath('/');
+    revalidatePath('/master');
 }
 
 

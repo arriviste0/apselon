@@ -1,4 +1,4 @@
-import { User, Job, Process, JobProcess } from './types';
+import { User, Job, Process, JobProcess, JobWithProcesses } from './types';
 import { PlaceHolderImages } from './placeholder-images';
 import { addDays, subDays, formatISO } from 'date-fns';
 
@@ -156,13 +156,30 @@ export const updateJob = async (jobData: Job): Promise<Job> => {
   throw new Error("Job not found");
 };
 
-export const deleteJob = async (jobId: string): Promise<void> => {
+export const deleteJob = async (jobId: string): Promise<JobWithProcesses | null> => {
   const jobIndex = jobs.findIndex(j => j.jobId.toLowerCase() === jobId.toLowerCase());
   if (jobIndex > -1) {
+    const jobToDelete = jobs[jobIndex];
+    const processesToDelete = jobProcesses.filter(jp => jp.jobId.toLowerCase() === jobId.toLowerCase());
+    
+    const deletedJob: JobWithProcesses = { ...jobToDelete, processes: processesToDelete };
+    
     jobs.splice(jobIndex, 1);
-    // Also delete associated job processes
     jobProcesses = jobProcesses.filter(jp => jp.jobId.toLowerCase() !== jobId.toLowerCase());
+    
+    return Promise.resolve(deletedJob);
   }
+  return Promise.resolve(null);
+};
+
+export const restoreJob = async (jobData: JobWithProcesses): Promise<void> => {
+  // Don't add if it already exists
+  if (jobs.some(j => j.jobId === jobData.jobId)) {
+    return Promise.resolve();
+  }
+  const { processes: restoredProcesses, ...job } = jobData;
+  jobs.unshift(job);
+  jobProcesses.push(...restoredProcesses);
   return Promise.resolve();
 };
 

@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { ListFilter, Search } from 'lucide-react';
 import { JobListItem } from './job-list-item';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { deleteJobAction, restoreJobAction } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardClientProps {
   initialJobs: JobWithProcesses[];
@@ -44,6 +46,8 @@ export default function DashboardClient({
   const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [jobToDelete, setJobToDelete] = React.useState<string | null>(null);
 
+  const { toast } = useToast();
+
   const handleJobCreated = (newJob: JobWithProcesses) => {
     setJobs((prevJobs) => [newJob, ...prevJobs]);
   };
@@ -52,10 +56,58 @@ export default function DashboardClient({
     setJobs((prevJobs) => prevJobs.map(j => j.jobId === updatedJob.jobId ? updatedJob : j));
   };
   
-  const handleJobDeleted = (jobId: string) => {
-    setJobs((prevJobs) => prevJobs.filter(j => j.jobId !== jobId));
+  const handleConfirmDelete = async () => {
+    if (!jobToDelete) return;
+
+    const job = jobs.find(j => j.jobId === jobToDelete);
+    if (!job) return;
+
+    // Optimistically remove the job from the UI
+    setJobs(prev => prev.filter(j => j.jobId !== jobToDelete));
     setJobToDelete(null);
-  }
+
+    try {
+      const deletedJob = await deleteJobAction(jobToDelete);
+      if (!deletedJob) throw new Error("Job not found on server");
+
+      toast({
+        title: 'Job Deleted',
+        description: `${deletedJob.jobId.toUpperCase()} has been deleted.`,
+        action: (
+          <Button
+            variant="ghost"
+            onClick={async () => {
+              try {
+                await restoreJobAction(deletedJob);
+                setJobs(prev => [...prev, deletedJob].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+                toast({
+                  title: 'Job Restored',
+                  description: `${deletedJob.jobId.toUpperCase()} has been restored.`
+                })
+              } catch (e) {
+                toast({
+                  title: 'Error',
+                  description: 'Failed to restore job.',
+                  variant: 'destructive'
+                });
+                // If restore fails, we might need to refetch to get the true state
+              }
+            }}
+          >
+            Undo
+          </Button>
+        )
+      });
+    } catch (error) {
+      // Revert optimistic update on failure
+      setJobs(prev => [...prev, job].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      toast({
+        title: 'Error',
+        description: 'Failed to delete job.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleEdit = (job: JobWithProcesses) => {
     setJobToEdit(job);
@@ -165,7 +217,7 @@ export default function DashboardClient({
             <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-                onClick={() => handleJobDeleted(jobToDelete!)}
+                onClick={handleConfirmDelete}
                 className="bg-destructive hover:bg-destructive/90"
             >
                 Delete
