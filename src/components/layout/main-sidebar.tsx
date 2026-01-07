@@ -14,6 +14,7 @@ import {
   Briefcase,
   Settings,
   LogOut,
+  BookMarked,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { AppLogo } from '@/components/icons';
@@ -40,6 +41,17 @@ export function MainSidebar() {
               >
                 <LayoutDashboard />
                 All Jobs
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <Link href="/master" passHref>
+              <SidebarMenuButton
+                isActive={pathname === '/master'}
+                tooltip="Master"
+              >
+                <BookMarked />
+                Master
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
