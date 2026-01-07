@@ -37,18 +37,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CalendarIcon, PlusCircle, Sparkles, Loader2 } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { User, Process, JobWithProcesses, Job } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { suggestOptimalProcessAssignments, SuggestOptimalProcessAssignmentsOutput } from '@/ai/flows/suggest-optimal-process-assignments';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
-import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { getJobs } from '@/lib/data';
 
 
 const formSchema = z.object({
@@ -106,6 +104,7 @@ interface CreateJobDialogProps {
 
 export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDialogProps) {
   const [open, setOpen] = React.useState(false);
+  const [existingJobId, setExistingJobId] = React.useState('');
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -155,6 +154,48 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         priority: "Medium",
     },
   });
+
+  const isRepeatJob = form.watch('isRepeat');
+
+  const handleFindJob = async () => {
+    if (!existingJobId) {
+        toast({ title: "Please enter a Job ID.", variant: "destructive" });
+        return;
+    }
+    // In a real app this might be a server action, but for this mock we'll fetch client-side
+    const allJobs = await getJobs();
+    const foundJob = allJobs.find(job => job.jobId.toLowerCase() === existingJobId.toLowerCase());
+
+    if (foundJob) {
+        // Exclude fields that should be re-entered for the new job
+        const { jobId, createdAt, status, ...jobDataToCopy } = foundJob;
+        
+        form.reset({
+            ...jobDataToCopy,
+            // Keep new job as repeat
+            isRepeat: true,
+            // Keep layer type
+            layerType: jobDataToCopy.layerType,
+            // Set new dates
+            dueDate: new Date(),
+            orderDate: new Date(),
+            // Set new PO/Ref
+            poNo: '',
+            refNo: '',
+            // Reset quantities
+            quantity: 0,
+            launchedPcbs: 0,
+            launchedPanels: 0,
+            // Clear the job ID so a new one can be entered
+            jobId: '',
+        });
+
+        toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
+    } else {
+        toast({ title: `Job with ID "${existingJobId}" not found.`, variant: "destructive" });
+    }
+  };
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -252,6 +293,21 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   </FormItem>
               )} />
             </div>
+
+            {isRepeatJob && (
+                <div className="flex items-end gap-2 p-4 border rounded-lg bg-muted/50">
+                    <div className="flex-grow">
+                        <FormLabel htmlFor="existing-job-id">Find Existing Job ID</FormLabel>
+                        <Input 
+                            id="existing-job-id"
+                            placeholder="Enter existing Job ID to copy details" 
+                            value={existingJobId}
+                            onChange={(e) => setExistingJobId(e.target.value)}
+                        />
+                    </div>
+                    <Button type="button" onClick={handleFindJob}><Search className="mr-2 h-4 w-4" /> Find Job</Button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
             
