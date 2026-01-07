@@ -169,24 +169,9 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
             const process = jobProcesses.find((p) => p.processId === processDef.processId);
             if (!process) return null;
 
-            const previousProcessJob = jobProcesses
-              .map(jp => ({ jp, pDef: allProcesses.find(p => p.processId === jp.processId)! }))
-              .filter(({ pDef }) => pDef.sequenceNumber < processDef.sequenceNumber)
-              .sort((a, b) => b.pDef.sequenceNumber - a.pDef.sequenceNumber)
-              .map(({ jp }) => jp)
-              .find(jp => jp && (jp.status === 'Completed' || jp.status === 'Rejected'));
-
-            let previousPendingQty = null;
-            if (previousProcessJob) {
-                const { quantityIn, quantityOut } = previousProcessJob;
-                if(typeof quantityIn === 'number' && typeof quantityOut === 'number') {
-                    previousPendingQty = quantityIn - quantityOut;
-                }
-            }
-
-
             const assignedUser = users.find((u) => u.id === process.assignedTo);
             const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
+            
             const pendingQty = (typeof process.quantityIn === 'number' && typeof process.quantityOut === 'number') 
               ? process.quantityIn - process.quantityOut
               : null;
@@ -267,7 +252,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                       )}
                       {process.status === 'In Progress' && (
                         <>
-                           {(previousPendingQty ?? 0) > 0 && (
+                           {(pendingQty ?? 0) > 0 && (
                              <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
                                 <RefreshCw className="mr-2 h-4 w-4" /> Rework
                              </Button>
