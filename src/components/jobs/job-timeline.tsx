@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle, Circle, Clock, XCircle, Play, MoreVertical, Minus, Plus } from 'lucide-react';
+import { CheckCircle, Circle, Clock, XCircle, Play, MoreVertical, Minus, Plus, RefreshCw } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { updateProcessStatusAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -53,7 +53,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
   
   const handleUpdateStatus = async (
     process: JobProcess, 
-    newStatus: 'Completed' | 'Rejected',
+    newStatus: 'Completed' | 'Rejected' | 'In Progress',
     quantityData: { launchedPanels?: number, quantityIn?: number, quantityOut?: number }
   ) => {
     
@@ -64,7 +64,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     const updatedProcess = {
         ...process,
         status: newStatus,
-        endTime: new Date().toISOString(),
+        endTime: newStatus !== 'In Progress' ? new Date().toISOString() : null,
         remarks: remarks[process.id] || process.remarks,
         ...quantityData,
     };
@@ -142,7 +142,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     }
   }
 
-  const openUpdateDialog = (process: JobProcess, newStatus: 'Completed' | 'Rejected') => {
+  const openUpdateDialog = (process: JobProcess, newStatus: 'Completed' | 'Rejected' | 'In Progress', prefillQuantities?: {in: number, out: number}) => {
     const processDef = allProcesses.find(p => p.processId === process.processId);
     if (!processDef) return;
 
@@ -154,7 +154,7 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
       
     const lastQuantity = previousProcess?.quantityOut ?? previousProcess?.launchedPanels ?? process.quantityIn ?? null;
 
-    setUpdateInfo({ process, processDef, newStatus, lastQuantity });
+    setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities });
   };
   
   return (
@@ -250,6 +250,9 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                       )}
                       {process.status === 'In Progress' && (
                         <>
+                           <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Rework
+                          </Button>
                           <Button variant="destructive" size="sm" onClick={() => openUpdateDialog(process, 'Rejected')}>
                             <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
                           </Button>

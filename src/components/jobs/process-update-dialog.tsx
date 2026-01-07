@@ -30,8 +30,9 @@ import { Info } from 'lucide-react';
 export interface ProcessUpdateInfo {
   process: JobProcess;
   processDef: Process;
-  newStatus: 'Completed' | 'Rejected';
+  newStatus: 'Completed' | 'Rejected' | 'In Progress';
   lastQuantity: number | null;
+  prefillQuantities?: { in: number; out: number };
 }
 
 interface ProcessUpdateDialogProps {
@@ -39,7 +40,7 @@ interface ProcessUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (
     process: JobProcess,
-    newStatus: 'Completed' | 'Rejected',
+    newStatus: 'Completed' | 'Rejected' | 'In Progress',
     quantityData: { launchedPanels?: number; quantityIn?: number; quantityOut?: number }
   ) => void;
   remarks: string;
@@ -74,8 +75,8 @@ export function ProcessUpdateDialog({
   React.useEffect(() => {
     if (updateInfo) {
       const defaultValues = {
-        quantityIn: updateInfo.lastQuantity ?? 0,
-        quantityOut: updateInfo.newStatus === 'Completed' ? (updateInfo.lastQuantity ?? 0) : 0,
+        quantityIn: updateInfo.prefillQuantities?.in ?? updateInfo.lastQuantity ?? 0,
+        quantityOut: updateInfo.prefillQuantities?.out ?? (updateInfo.newStatus === 'Completed' ? (updateInfo.lastQuantity ?? 0) : 0),
       };
       form.reset(defaultValues);
     }
@@ -91,18 +92,31 @@ export function ProcessUpdateDialog({
   const isOpen = !!updateInfo;
   const processName = updateInfo?.processDef.processName;
   const status = updateInfo?.newStatus;
+  const isRework = status === 'In Progress';
+
+  const getTitle = () => {
+    if (isRework) return `Rework: ${processName}`;
+    return `Update Process: ${processName}`;
+  }
+
+  const getDescription = () => {
+    if (isRework) return `Log a rework for this process.`;
+    return `Confirming status as `
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Update Process: {processName}</DialogTitle>
+          <DialogTitle>{getTitle()}</DialogTitle>
           <DialogDescription>
-            Confirming status as <span className={status === 'Completed' ? "text-green-600" : "text-destructive"}>{status}</span>. Please provide quantities.
+            {getDescription()}
+            {!isRework && <span className={status === 'Completed' ? "text-green-600" : "text-destructive"}>{status}</span>}
+            . Please provide quantities.
           </DialogDescription>
         </DialogHeader>
 
-        {updateInfo?.lastQuantity !== null && (
+        {updateInfo?.lastQuantity !== null && !isRework && (
              <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
@@ -161,7 +175,7 @@ export function ProcessUpdateDialog({
                 variant={status === 'Rejected' ? 'destructive' : 'default'}
                 disabled={form.formState.isSubmitting}
               >
-                {form.formState.isSubmitting ? 'Saving...' : `Confirm ${status}`}
+                {form.formState.isSubmitting ? 'Saving...' : isRework ? 'Log Rework' : `Confirm ${status}`}
               </Button>
             </DialogFooter>
           </form>
