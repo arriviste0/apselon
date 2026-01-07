@@ -764,7 +764,7 @@ export function CreateJobDialog({
                     <FormItem><FormLabel>Sheet Width</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="sheetSizeHeight" render={({ field }) => (
-                    <FormItem><FormLabel>Sheet Height</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Sheet Length</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                  <FormField control={form.control} name="sheetUtilization" render={({ field }) => (
