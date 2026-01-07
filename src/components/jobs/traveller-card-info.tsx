@@ -30,7 +30,7 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
             <InfoItem label="Lead Time" value={job.leadTime} />
             <InfoItem label="Del Date" value={format(parseISO(job.dueDate), 'dd-MMM-yy')} />
             <InfoItem label="P.O. No." value={job.poNo} />
-            <InfoItem label="PO Date" value={format(parseISO(job.poDate), 'dd-MMM-yy')} />
+            <InfoItem label="Order Date" value={format(parseISO(job.orderDate), 'dd-MMM-yy')} />
             <InfoItem label="Order Qty" value={job.quantity} />
             <InfoItem label="Launched PCBs" value={job.launchedPcbs} />
             <InfoItem label="Launched Panels" value={job.launchedPanels} />

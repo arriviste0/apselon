@@ -16,7 +16,7 @@ export interface Job {
   quantity: number;
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   poNo: string;
-  poDate: string;
+  orderDate: string;
   isRepeat: boolean;
   layerType: 'Single' | 'Double';
   leadTime: string;

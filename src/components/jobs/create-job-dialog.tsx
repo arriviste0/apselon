@@ -61,7 +61,7 @@ const formSchema = z.object({
   partNo: z.string().min(1, 'Part No. is required'),
   dueDate: z.date({ required_error: 'A due date is required.' }),
   poNo: z.string().min(1, 'P.O. No. is required'),
-  poDate: z.date({ required_error: 'A P.O. date is required.' }),
+  orderDate: z.date({ required_error: 'An order date is required.' }),
   quantity: z.coerce.number().min(1, 'Order quantity must be at least 1'),
   launchedPcbs: z.coerce.number().optional(),
   launchedPanels: z.coerce.number().optional(),
@@ -163,7 +163,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
       const jobData: Job = {
           ...values,
           dueDate: format(values.dueDate, 'yyyy-MM-dd'),
-          poDate: format(values.poDate, 'yyyy-MM-dd'),
+          orderDate: format(values.orderDate, 'yyyy-MM-dd'),
           // These are not on the form, but required by the type
           createdAt: new Date().toISOString(),
           status: 'In Progress',
@@ -286,8 +286,8 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 <FormField control={form.control} name="poNo" render={({ field }) => (
                     <FormItem><FormLabel>P.O. No.</FormLabel><FormControl><Input placeholder="WHATSAPP" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="poDate" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel>PO Date</FormLabel><Popover><PopoverTrigger asChild><FormControl>
+                <FormField control={form.control} name="orderDate" render={({ field }) => (
+                  <FormItem className="flex flex-col"><FormLabel>Order Date</FormLabel><Popover><PopoverTrigger asChild><FormControl>
                     <Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}>
                       {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
