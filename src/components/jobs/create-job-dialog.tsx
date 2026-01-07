@@ -189,21 +189,37 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     const foundJob = allJobs.find(job => job.jobId === jobId);
 
     if (foundJob) {
-        const { createdAt, status, ...jobDataToCopy } = foundJob;
+        const { 
+            createdAt, 
+            status,
+            dueDate,
+            orderDate,
+            leadTime,
+            poNo,
+            quantity,
+            launchedPcbs,
+            launchedPanels,
+            refNo,
+            mTraceSetup,
+            oneP,
+            ...jobDataToCopy 
+        } = foundJob;
         
         form.reset({
-            ...form.getValues(), // keep current form values
+            ...form.getValues(), // keep current form values, especially isRepeat
             ...jobDataToCopy,
             isRepeat: true,
+            // Reset fields that should be re-entered
             dueDate: new Date(),
             orderDate: new Date(),
-            poNo: '',
-            refNo: '',
+            leadTime: "",
+            poNo: "",
             quantity: 0,
             launchedPcbs: 0,
             launchedPanels: 0,
-            mTraceSetup: '', // Reset this field
-            oneP: '', // Reset this field
+            refNo: "",
+            mTraceSetup: "", // Reset this field
+            oneP: "", // Reset this field
         });
 
         toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
