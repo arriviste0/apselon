@@ -84,7 +84,9 @@ let jobs: Job[] = [
     legendSide: "BOTH",
     surfaceFinish: "HAL",
     vGrooving: true,
-    cutting: "M-CUTTING",
+    cutting: "M-Cutting",
+    mTraceSetup: "SETUP",
+    oneP: "1 P",
     sheetSizeWidth: 1040,
     sheetSizeHeight: 1240,
     sheetUtilization: 94,
@@ -129,7 +131,7 @@ export const getJobProcessesByJobId = async (jobId: string): Promise<JobProcess[
 
 
 // Actions to modify data
-export const addJob = async (jobData: Omit<Job, 'createdAt' | 'status'>): Promise<Job> => {
+export const addJob = async (jobData: Job): Promise<Job> => {
   const newJob: Job = {
     ...jobData,
     createdAt: new Date().toISOString(),

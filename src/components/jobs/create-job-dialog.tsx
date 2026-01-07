@@ -37,7 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CalendarIcon, PlusCircle, Search } from 'lucide-react';
+import { CalendarIcon, PlusCircle, Search, ChevronsUpDown, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { User, Process, JobWithProcesses, Job } from '@/lib/types';
@@ -47,6 +47,14 @@ import { Switch } from '../ui/switch';
 import { ScrollArea } from '../ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { getJobs } from '@/lib/data';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 
 const formSchema = z.object({
@@ -87,6 +95,8 @@ const formSchema = z.object({
   surfaceFinish: z.string().optional(),
   vGrooving: z.boolean().default(false),
   cutting: z.string().optional(),
+  mTraceSetup: z.string().optional(),
+  oneP: z.string().optional(),
   sheetSizeWidth: z.coerce.number().optional(),
   sheetSizeHeight: z.coerce.number().optional(),
   sheetUtilization: z.coerce.number().optional(),
@@ -104,9 +114,21 @@ interface CreateJobDialogProps {
 
 export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const [existingJobSearchTerm, setExistingJobSearchTerm] = React.useState('');
   const { toast } = useToast();
+  const [allJobs, setAllJobs] = React.useState<Job[]>([]);
+  const [comboboxOpen, setComboboxOpen] = React.useState(false);
+  const [selectedJobId, setSelectedJobId] = React.useState('');
   
+  React.useEffect(() => {
+    async function fetchJobs() {
+        const jobs = await getJobs();
+        setAllJobs(jobs);
+    }
+    if (open) {
+        fetchJobs();
+    }
+  }, [open]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -144,7 +166,9 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         legendSide: "BOTH",
         surfaceFinish: "HAL",
         vGrooving: false,
-        cutting: "M-CUTTING",
+        cutting: "M-Cutting",
+        mTraceSetup: "",
+        oneP: "",
         sheetSizeWidth: 0,
         sheetSizeHeight: 0,
         sheetUtilization: 0,
@@ -156,27 +180,17 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
   });
 
   const isRepeatJob = form.watch('isRepeat');
-
-  const handleFindJob = async () => {
-    if (!existingJobSearchTerm) {
-        toast({ title: "Please enter a Job No, Customer Name, or Part No.", variant: "destructive" });
-        return;
-    }
-    const allJobs = await getJobs();
-    const searchTerm = existingJobSearchTerm.toLowerCase();
-    const foundJob = allJobs.find(job => 
-        job.jobId.toLowerCase() === searchTerm ||
-        job.customerName.toLowerCase().includes(searchTerm) ||
-        job.partNo.toLowerCase().includes(searchTerm)
-    );
+  
+  const handleJobSelect = (jobId: string) => {
+    const foundJob = allJobs.find(job => job.jobId === jobId);
 
     if (foundJob) {
-        const { createdAt, status, ...jobDataToCopy } = foundJob;
+        const { createdAt, status, mTraceSetup, oneP, ...jobDataToCopy } = foundJob;
         
         form.reset({
             ...jobDataToCopy,
             isRepeat: true,
-            layerType: jobDataToCopy.layerType,
+            layerType: jobDataToCopy.layerType as 'Single' | 'Double',
             dueDate: new Date(),
             orderDate: new Date(),
             poNo: '',
@@ -185,11 +199,15 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             launchedPcbs: 0,
             launchedPanels: 0,
             jobId: jobDataToCopy.jobId,
+            mTraceSetup: '', // Reset this field
+            oneP: '', // Reset this field
         });
 
         toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
+        setSelectedJobId(jobId);
+        setComboboxOpen(false);
     } else {
-        toast({ title: `Job with term "${existingJobSearchTerm}" not found.`, variant: "destructive" });
+        toast({ title: `Job with ID "${jobId}" not found.`, variant: "destructive" });
     }
   };
 
@@ -213,6 +231,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
       onJobCreated(newJobWithProcesses);
       setOpen(false);
       form.reset();
+      setSelectedJobId('');
     } catch (error) {
         toast({
             title: 'Error',
@@ -221,9 +240,17 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         });
     }
   }
+  
+  const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+            form.reset();
+            setSelectedJobId('');
+        }
+    }}>
       <DialogTrigger asChild>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
@@ -291,17 +318,51 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             </div>
 
             {isRepeatJob && (
-                <div className="flex items-end gap-2 p-4 border rounded-lg bg-muted/50">
-                    <div className="flex-grow">
-                        <FormLabel htmlFor="existing-job-search">Find Existing Job</FormLabel>
-                        <Input 
-                            id="existing-job-search"
-                            placeholder="Enter Job No, Customer, or Part No. to copy details" 
-                            value={existingJobSearchTerm}
-                            onChange={(e) => setExistingJobSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <Button type="button" onClick={handleFindJob}><Search className="mr-2 h-4 w-4" /> Find Job</Button>
+                <div className="p-4 border rounded-lg bg-muted/50">
+                    <FormLabel>Find Existing Job to Copy</FormLabel>
+                     <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={comboboxOpen}
+                            className="w-full justify-between mt-2"
+                            >
+                            {selectedJobId
+                                ? `${selectedJobDisplayValue?.jobId.toUpperCase()} - ${selectedJobDisplayValue?.customerName} - ${selectedJobDisplayValue?.partNo}`
+                                : "Select job to copy..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                                <CommandInput placeholder="Search by Job No, Customer, or Part No..." />
+                                <CommandList>
+                                    <CommandEmpty>No job found.</CommandEmpty>
+                                    <CommandGroup>
+                                        {allJobs.map((job) => (
+                                        <CommandItem
+                                            key={job.jobId}
+                                            value={`${job.jobId} ${job.customerName} ${job.partNo}`}
+                                            onSelect={() => handleJobSelect(job.jobId)}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedJobId === job.jobId ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            <div className='flex flex-col'>
+                                                <span className='font-medium'>{job.jobId.toUpperCase()} - {job.partNo}</span>
+                                                <span className='text-sm text-muted-foreground'>{job.customerName}</span>
+                                            </div>
+                                        </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             )}
 
@@ -461,6 +522,15 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="mTraceSetup" render={({ field }) => (
+                      <FormItem><FormLabel>M Trace Setup</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="oneP" render={({ field }) => (
+                      <FormItem><FormLabel>1 P</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
                 
                 <h4 className="text-md font-semibold border-b pb-1 pt-2">CCL Cutting Plan</h4>
                 <div className="grid grid-cols-2 gap-4">
