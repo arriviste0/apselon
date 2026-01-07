@@ -192,9 +192,9 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         const { createdAt, status, ...jobDataToCopy } = foundJob;
         
         form.reset({
+            ...form.getValues(), // keep current form values
             ...jobDataToCopy,
             isRepeat: true,
-            layerType: jobDataToCopy.layerType,
             dueDate: new Date(),
             orderDate: new Date(),
             poNo: '',
@@ -202,7 +202,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             quantity: 0,
             launchedPcbs: 0,
             launchedPanels: 0,
-            jobId: jobDataToCopy.jobId,
             mTraceSetup: '', // Reset this field
             oneP: '', // Reset this field
         });
@@ -245,13 +244,60 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
   
   const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
 
+  const defaultFormValues = {
+        isRepeat: false,
+        layerType: 'Double Layer (D/S)',
+        jobId: "",
+        refNo: "",
+        customerName: "",
+        leadTime: "",
+        partNo: "",
+        poNo: "WHATS APP",
+        quantity: 0,
+        launchedPcbs: 0,
+        launchedPanels: 0,
+        sqMt: 0,
+        pnlHole: 0,
+        totalHole: 0,
+        pcbSizeWidth: 0,
+        pcbSizeHeight: 0,
+        arraySizeWidth: 0,
+        arraySizeHeight: 0,
+        upsArrayWidth: 0,
+        upsArrayHeight: 0,
+        panelSizeWidth: 0,
+        panelSizeHeight: 0,
+        upsPanel: 0,
+        material: "FR4",
+        copperWeight: "H/H (18/18)",
+        thickness: 1.6,
+        source: "Any",
+        ink: "Any",
+        ulLogo: false,
+        solderMask: "GREEN",
+        legendColour: "WHITE",
+        legendSide: "BOTH",
+        surfaceFinish: "HASL",
+        vGrooving: false,
+        cutting: "M-Cutting",
+        mTraceSetup: "SETUP",
+        oneP: "",
+        sheetSizeWidth: 0,
+        sheetSizeHeight: 0,
+        sheetUtilization: 0,
+        panelsInSheet: 0,
+        supplyInfo: "",
+        description: "",
+        priority: "Medium",
+        testingRequired: 'Normal BBT',
+        preparedBy: 'Ashutosh Vyas',
+    };
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
         setOpen(isOpen);
         if (!isOpen) {
-            form.reset({
-                mTraceSetup: "SETUP"
-            });
+            form.reset(defaultFormValues);
             setSelectedJobId('');
         }
     }}>
@@ -285,8 +331,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                         onCheckedChange={(checked) => {
                             field.onChange(checked);
                             if (!checked) {
-                                form.reset();
-                                form.setValue('mTraceSetup', 'SETUP');
+                                form.reset(defaultFormValues);
                                 setSelectedJobId('');
                             }
                         }}
@@ -312,7 +357,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                       <SelectContent>
                         <SelectItem value="Single Layer (S/S)">Single Layer (S/S)</SelectItem>
                         <SelectItem value="Double Layer (D/S)">Double Layer (D/S)</SelectItem>
-                        <SelectItem value="4 Layer">4 Layer</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -516,7 +560,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
               <FormField control={form.control} name="thickness" render={({ field }) => (
                     <FormItem>
                       <FormLabel>PCB Thickness</FormLabel>
-                      <Select onValueChange={(value) => field.onChange(Number(value))} defaultValue={String(field.value)}>
+                      <Select onValueChange={(value) => field.onChange(Number(value))} value={String(field.value)}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select thickness" /></SelectTrigger>
                         </FormControl>
