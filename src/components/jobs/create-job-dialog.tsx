@@ -37,7 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { CalendarIcon, PlusCircle, Search, ChevronsUpDown, Check } from 'lucide-react';
+import { CalendarIcon, PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { User, Process, JobWithProcesses, Job } from '@/lib/types';
@@ -206,8 +206,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
         setSelectedJobId(jobId);
         setComboboxOpen(false);
-    } else {
-        toast({ title: `Job with ID "${jobId}" not found.`, variant: "destructive" });
     }
   };
 
@@ -247,7 +245,9 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     <Dialog open={open} onOpenChange={(isOpen) => {
         setOpen(isOpen);
         if (!isOpen) {
-            form.reset();
+            form.reset({
+                mTraceSetup: "SETUP"
+            });
             setSelectedJobId('');
         }
     }}>
@@ -278,7 +278,14 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                     <FormControl>
                       <Switch
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (!checked) {
+                                form.reset();
+                                form.setValue('mTraceSetup', 'SETUP');
+                                setSelectedJobId('');
+                            }
+                        }}
                       />
                     </FormControl>
                     <FormLabel className="font-normal">
@@ -328,7 +335,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                             aria-expanded={comboboxOpen}
                             className="w-full justify-between mt-2"
                             >
-                            {selectedJobId
+                            {selectedJobId && selectedJobDisplayValue
                                 ? `${selectedJobDisplayValue?.jobId.toUpperCase()} - ${selectedJobDisplayValue?.customerName} - ${selectedJobDisplayValue?.partNo}`
                                 : "Select job to copy..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -522,15 +529,12 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                     </FormItem>
                   )}
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="mTraceSetup" render={({ field }) => (
-                      <FormItem><FormLabel>M Trace Setup</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="oneP" render={({ field }) => (
-                      <FormItem><FormLabel>1 P</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
+                <FormField control={form.control} name="mTraceSetup" render={({ field }) => (
+                    <FormItem><FormLabel>M Trace Setup</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="oneP" render={({ field }) => (
+                    <FormItem><FormLabel>1 P</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
                 
                 <h4 className="text-md font-semibold border-b pb-1 pt-2">CCL Cutting Plan</h4>
                 <div className="grid grid-cols-2 gap-4">
