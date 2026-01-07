@@ -104,7 +104,7 @@ interface CreateJobDialogProps {
 
 export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const [existingJobId, setExistingJobId] = React.useState('');
+  const [existingJobSearchTerm, setExistingJobSearchTerm] = React.useState('');
   const { toast } = useToast();
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -158,41 +158,38 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
   const isRepeatJob = form.watch('isRepeat');
 
   const handleFindJob = async () => {
-    if (!existingJobId) {
-        toast({ title: "Please enter a Job ID.", variant: "destructive" });
+    if (!existingJobSearchTerm) {
+        toast({ title: "Please enter a Job No, Customer Name, or Part No.", variant: "destructive" });
         return;
     }
-    // In a real app this might be a server action, but for this mock we'll fetch client-side
     const allJobs = await getJobs();
-    const foundJob = allJobs.find(job => job.jobId.toLowerCase() === existingJobId.toLowerCase());
+    const searchTerm = existingJobSearchTerm.toLowerCase();
+    const foundJob = allJobs.find(job => 
+        job.jobId.toLowerCase() === searchTerm ||
+        job.customerName.toLowerCase().includes(searchTerm) ||
+        job.partNo.toLowerCase().includes(searchTerm)
+    );
 
     if (foundJob) {
-        // Exclude fields that should be re-entered for the new job
-        const { jobId, createdAt, status, ...jobDataToCopy } = foundJob;
+        const { createdAt, status, ...jobDataToCopy } = foundJob;
         
         form.reset({
             ...jobDataToCopy,
-            // Keep new job as repeat
             isRepeat: true,
-            // Keep layer type
             layerType: jobDataToCopy.layerType,
-            // Set new dates
             dueDate: new Date(),
             orderDate: new Date(),
-            // Set new PO/Ref
             poNo: '',
             refNo: '',
-            // Reset quantities
             quantity: 0,
             launchedPcbs: 0,
             launchedPanels: 0,
-            // Clear the job ID so a new one can be entered
-            jobId: '',
+            jobId: jobDataToCopy.jobId,
         });
 
         toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
     } else {
-        toast({ title: `Job with ID "${existingJobId}" not found.`, variant: "destructive" });
+        toast({ title: `Job with term "${existingJobSearchTerm}" not found.`, variant: "destructive" });
     }
   };
 
@@ -203,7 +200,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
           ...values,
           dueDate: format(values.dueDate, 'yyyy-MM-dd'),
           orderDate: format(values.orderDate, 'yyyy-MM-dd'),
-          // These are not on the form, but required by the type
           createdAt: new Date().toISOString(),
           status: 'In Progress',
       };
@@ -297,12 +293,12 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             {isRepeatJob && (
                 <div className="flex items-end gap-2 p-4 border rounded-lg bg-muted/50">
                     <div className="flex-grow">
-                        <FormLabel htmlFor="existing-job-id">Find Existing Job ID</FormLabel>
+                        <FormLabel htmlFor="existing-job-search">Find Existing Job</FormLabel>
                         <Input 
-                            id="existing-job-id"
-                            placeholder="Enter existing Job ID to copy details" 
-                            value={existingJobId}
-                            onChange={(e) => setExistingJobId(e.target.value)}
+                            id="existing-job-search"
+                            placeholder="Enter Job No, Customer, or Part No. to copy details" 
+                            value={existingJobSearchTerm}
+                            onChange={(e) => setExistingJobSearchTerm(e.target.value)}
                         />
                     </div>
                     <Button type="button" onClick={handleFindJob}><Search className="mr-2 h-4 w-4" /> Find Job</Button>
