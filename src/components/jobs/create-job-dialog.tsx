@@ -70,7 +70,8 @@ const formSchema = z.object({
   quantity: z.coerce.number().min(1, 'Order quantity must be at least 1'),
   launchedPcbs: z.coerce.number().optional(),
   launchedPanels: z.coerce.number().optional(),
-  sqMt: z.coerce.number().optional(),
+  launchedPcbSqm: z.coerce.number().optional(),
+  launchedPanelSqm: z.coerce.number().optional(),
   pnlHole: z.coerce.number().optional(),
   totalHole: z.coerce.number().optional(),
   pcbSizeWidth: z.coerce.number().optional(),
@@ -155,7 +156,8 @@ export function CreateJobDialog({
         quantity: 0,
         launchedPcbs: 0,
         launchedPanels: 0,
-        sqMt: 0,
+        launchedPcbSqm: 0,
+        launchedPanelSqm: 0,
         pnlHole: 0,
         totalHole: 0,
         pcbSizeWidth: 0,
@@ -232,6 +234,8 @@ export function CreateJobDialog({
             quantity,
             launchedPcbs,
             launchedPanels,
+            launchedPcbSqm,
+            launchedPanelSqm,
             // Keep the rest
             ...jobDataToCopy 
         } = foundJob;
@@ -247,6 +251,8 @@ export function CreateJobDialog({
             quantity: 0,
             launchedPcbs: 0,
             launchedPanels: 0,
+            launchedPcbSqm: 0,
+            launchedPanelSqm: 0,
             mTraceSetup: "", // Reset this field
             oneP: "", // Reset this field
         });
@@ -494,8 +500,11 @@ export function CreateJobDialog({
                  <FormField control={form.control} name="launchedPanels" render={({ field }) => (
                     <FormItem><FormLabel>Launched Panels</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                 <FormField control={form.control} name="sqMt" render={({ field }) => (
-                    <FormItem><FormLabel>SQ.MT</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                 <FormField control={form.control} name="launchedPcbSqm" render={({ field }) => (
+                    <FormItem><FormLabel>Launch PCB SQM</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="launchedPanelSqm" render={({ field }) => (
+                    <FormItem><FormLabel>Launch Panel SQM</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="pnlHole" render={({ field }) => (
                     <FormItem><FormLabel>1PNL Hole</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>

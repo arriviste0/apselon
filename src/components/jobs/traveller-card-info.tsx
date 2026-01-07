@@ -34,7 +34,8 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
             <InfoItem label="Order Qty" value={job.quantity} />
             <InfoItem label="Launched PCBs" value={job.launchedPcbs} />
             <InfoItem label="Launched Panels" value={job.launchedPanels} />
-            <InfoItem label="SQ.MT" value={job.sqMt} />
+            <InfoItem label="Launch PCB SQM" value={job.launchedPcbSqm} />
+            <InfoItem label="Launch Panel SQM" value={job.launchedPanelSqm} />
             <InfoItem label="1PNL Hole" value={job.pnlHole} />
             <InfoItem label="Total Hole" value={job.totalHole} />
             <InfoItem label="Repeat Job" value={job.isRepeat ? 'Yes' : 'No'} />

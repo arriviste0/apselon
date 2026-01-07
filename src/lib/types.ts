@@ -23,7 +23,8 @@ export interface Job {
   refNo?: string;
   launchedPcbs?: number;
   launchedPanels?: number;
-  sqMt?: number;
+  launchedPcbSqm?: number;
+  launchedPanelSqm?: number;
   pnlHole?: number;
   totalHole?: number;
   pcbSizeWidth?: number;
