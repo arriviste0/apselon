@@ -17,6 +17,9 @@ export async function createJobAction(data: Job): Promise<JobWithProcesses> {
     startTime: index === 0 ? new Date().toISOString() : null,
     endTime: null,
     remarks: null,
+    quantityIn: index === 0 ? job.launchedPanels : null,
+    quantityOut: null,
+    launchedPanels: index === 0 ? job.launchedPanels : null,
   }));
   
   await addJobProcesses(jobProcesses);
@@ -54,6 +57,9 @@ interface UpdateProcessStatusData {
     newStatus: 'Completed' | 'Rejected' | 'In Progress';
     remarks?: string;
     userId: string;
+    launchedPanels?: number;
+    quantityIn?: number;
+    quantityOut?: number;
 }
 
 export async function updateProcessStatusAction(data: UpdateProcessStatusData) {

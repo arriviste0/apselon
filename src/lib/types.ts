@@ -79,6 +79,9 @@ export interface JobProcess {
   startTime: string | null;
   endTime: string | null;
   remarks: string | null;
+  quantityIn?: number | null;
+  quantityOut?: number | null;
+  launchedPanels?: number | null;
 }
 
 export interface JobWithProcesses extends Job {

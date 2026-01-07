@@ -105,8 +105,8 @@ type JobProcessStatus = 'Pending' | 'In Progress' | 'Completed' | 'Rejected';
 
 let jobProcesses: JobProcess[] = [
   // Job 1
-  { id: 'jp-1-1', jobId: 'a2511', processId: 'proc-1', assignedTo: 'user-2', status: 'In Progress', startTime: formatISO(subDays(new Date(), 5)), endTime: null, remarks: 'Initial design approved.' },
-  ...processes.slice(1).map(p => ({ id: `jp-1-${p.sequenceNumber}`, jobId: 'a2511', processId: p.processId, assignedTo: null, status: 'Pending' as JobProcessStatus, startTime: null, endTime: null, remarks: null })),
+  { id: 'jp-1-1', jobId: 'a2511', processId: 'proc-1', assignedTo: 'user-2', status: 'In Progress', startTime: formatISO(subDays(new Date(), 5)), endTime: null, remarks: 'Initial design approved.', quantityIn: 32, quantityOut: null, launchedPanels: 32 },
+  ...processes.slice(1).map(p => ({ id: `jp-1-${p.sequenceNumber}`, jobId: 'a2511', processId: p.processId, assignedTo: null, status: 'Pending' as JobProcessStatus, startTime: null, endTime: null, remarks: null, quantityIn: null, quantityOut: null, launchedPanels: null })),
 ];
 
 // Simulate a database with async functions

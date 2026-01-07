@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle, Circle, Clock, XCircle, Play, MoreVertical } from 'lucide-react';
+import { CheckCircle, Circle, Clock, XCircle, Play, MoreVertical, Minus, Plus } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { updateProcessStatusAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '../ui/label';
+import { ProcessUpdateDialog, type ProcessUpdateInfo } from './process-update-dialog';
 
 
 interface JobTimelineProps {
@@ -47,21 +48,25 @@ const statusColors = {
 export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentUser, onProcessUpdate }: JobTimelineProps) {
   const { toast } = useToast();
   const [remarks, setRemarks] = React.useState<Record<string, string>>({});
+  const [updateInfo, setUpdateInfo] = React.useState<ProcessUpdateInfo | null>(null);
+
   
-  const handleUpdateStatus = async (process: JobProcess, newStatus: 'Completed' | 'Rejected' | 'In Progress') => {
-    const remark = remarks[process.id] || '';
+  const handleUpdateStatus = async (
+    process: JobProcess, 
+    newStatus: 'Completed' | 'Rejected',
+    quantityData: { launchedPanels?: number, quantityIn?: number, quantityOut?: number }
+  ) => {
     
     // Store previous state for undo
-    const previousProcessState = process;
-    const previousProcessesState = jobProcesses;
+    const previousProcessesState = [...jobProcesses];
 
     // Optimistic update
     const updatedProcess = {
         ...process,
         status: newStatus,
-        endTime: ['Completed', 'Rejected'].includes(newStatus) ? new Date().toISOString() : null,
-        startTime: newStatus === 'In Progress' && !process.startTime ? new Date().toISOString() : process.startTime,
-        remarks: remark || process.remarks
+        endTime: new Date().toISOString(),
+        remarks: remarks[process.id] || process.remarks,
+        ...quantityData,
     };
     onProcessUpdate(updatedProcess);
 
@@ -70,8 +75,9 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
             jobId: jobId,
             processId: process.processId,
             newStatus,
-            remarks: remark,
+            remarks: remarks[process.id] || '',
             userId: currentUser.id,
+            ...quantityData
         });
 
         toast({
@@ -99,111 +105,190 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
             variant: 'destructive',
         });
         // Revert optimistic update on failure
-        onProcessUpdate(previousProcessState);
+        onProcessUpdate(previousProcessesState);
+    } finally {
+        setUpdateInfo(null);
+        setRemarks(prev => ({...prev, [process.id]: ''}))
     }
   };
 
+  const handleStartProcess = async (process: JobProcess) => {
+    const previousProcessesState = [...jobProcesses];
+    const updatedProcess = {
+      ...process,
+      status: 'In Progress' as const,
+      startTime: new Date().toISOString(),
+    };
+    onProcessUpdate(updatedProcess);
+
+    try {
+      await updateProcessStatusAction({
+        jobId,
+        processId: process.processId,
+        newStatus: 'In Progress',
+        userId: currentUser.id,
+      });
+      toast({
+        title: 'Process Started',
+        description: `${allProcesses.find(p => p.processId === process.processId)?.processName} is now in progress.`
+      });
+    } catch (error) {
+      toast({
+        title: 'Update failed',
+        description: 'Could not start process. Please try again.',
+        variant: 'destructive'
+      });
+      onProcessUpdate(previousProcessesState);
+    }
+  }
+
+  const openUpdateDialog = (process: JobProcess, newStatus: 'Completed' | 'Rejected') => {
+    const processDef = allProcesses.find(p => p.processId === process.processId);
+    if (!processDef) return;
+
+    const previousProcess = allProcesses
+      .filter(p => p.sequenceNumber < processDef.sequenceNumber)
+      .sort((a,b) => b.sequenceNumber - a.sequenceNumber)
+      .map(p => jobProcesses.find(jp => jp.processId === p.processId))
+      .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
+      
+    const lastQuantity = previousProcess?.quantityOut ?? previousProcess?.launchedPanels ?? null;
+
+    setUpdateInfo({ process, processDef, newStatus, lastQuantity });
+  };
+  
+  const qcProcesses = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
 
   return (
-    <div className="relative pl-8">
-      {/* Vertical line */}
-      <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border -translate-x-1/2" />
+    <>
+      <div className="relative pl-8">
+        {/* Vertical line */}
+        <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border -translate-x-1/2" />
 
-      <div className="space-y-8">
-        {allProcesses.map((processDef) => {
-          const process = jobProcesses.find((p) => p.processId === processDef.processId);
-          if (!process) return null;
+        <div className="space-y-8">
+          {allProcesses.map((processDef) => {
+            const process = jobProcesses.find((p) => p.processId === processDef.processId);
+            if (!process) return null;
 
-          const assignedUser = users.find((u) => u.id === process.assignedTo);
-          const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
+            const assignedUser = users.find((u) => u.id === process.assignedTo);
+            const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
+            
+            const isQcProcess = qcProcesses.includes(processDef.processName);
 
-          return (
-            <div key={process.id} className="relative">
-              <div className="absolute left-4 top-5 -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
-                {statusIcons[process.status]}
-              </div>
-              <Card className={`ml-8 border-l-4 ${statusColors[process.status]}`}>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
+            return (
+              <div key={process.id} className="relative">
+                <div className="absolute left-4 top-5 -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
+                  {statusIcons[process.status]}
+                </div>
+                <Card className={`ml-8 border-l-4 ${statusColors[process.status]}`}>
+                  <CardHeader>
+                      <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle>{processDef.processName}</CardTitle>
+                            <CardDescription>
+                              Status: <span className="font-semibold">{process.status}</span>
+                              {process.startTime && ` | Started: ${format(parseISO(process.startTime), 'PPp')}`}
+                            </CardDescription>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              {assignedUser && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                  <Avatar className="h-8 w-8">
+                                      <AvatarImage src={assignedUser.avatarUrl} data-ai-hint="person portrait" />
+                                      <AvatarFallback>{assignedUser.name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <span>{assignedUser.name}</span>
+                                  </div>
+                              )}
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                      <DropdownMenuItem>Assign User</DropdownMenuItem>
+                                      <DropdownMenuItem>View History</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                          </div>
+                      </div>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    <div className="space-y-4">
+                      {(process.remarks || (process.status === 'In Progress' && canUpdate)) && (
                         <div>
-                          <CardTitle>{processDef.processName}</CardTitle>
-                          <CardDescription>
-                            Status: <span className="font-semibold">{process.status}</span>
-                            {process.startTime && ` | Started: ${format(parseISO(process.startTime), 'PPp')}`}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {assignedUser && (
-                                <div className="flex items-center gap-2 text-sm">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarImage src={assignedUser.avatarUrl} data-ai-hint="person portrait" />
-                                    <AvatarFallback>{assignedUser.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <span>{assignedUser.name}</span>
-                                </div>
-                            )}
-                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuItem>Assign User</DropdownMenuItem>
-                                    <DropdownMenuItem>View History</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </div>
-                </CardHeader>
-                {(process.remarks || canUpdate) && (
-                    <CardContent>
-                      {process.status === 'In Progress' && canUpdate ? (
-                        <Textarea 
-                            placeholder="Add remarks or issue notes..." 
-                            value={remarks[process.id] || ''}
-                            onChange={(e) => setRemarks(prev => ({...prev, [process.id]: e.target.value}))}
-                        />
-                      ) : process.remarks && (
-                        <p className="text-sm text-muted-foreground border-l-2 pl-2">
-                          <strong>Note:</strong> {process.remarks}
-                        </p>
-                      )}
-                    </CardContent>
-                )}
-                {canUpdate && (
-                  <CardFooter className="flex justify-end items-center gap-4">
-                    {process.status === 'Pending' && (
-                      <Button onClick={() => handleUpdateStatus(process, 'In Progress')}>
-                        <Play className="mr-2 h-4 w-4" /> Start
-                      </Button>
-                    )}
-                    {process.status === 'In Progress' && (
-                      <>
-                        <Button variant="destructive" size="sm" onClick={() => handleUpdateStatus(process, 'Rejected')}>
-                          <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
-                        </Button>
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`complete-${process.id}`}
-                                onCheckedChange={(checked) => {
-                                if (checked) {
-                                    handleUpdateStatus(process, 'Completed');
-                                }
-                                }}
-                                checked={process.status === 'Completed'}
+                          {process.status === 'In Progress' && canUpdate ? (
+                            <Textarea 
+                                placeholder="Add remarks or issue notes..." 
+                                value={remarks[process.id] || ''}
+                                onChange={(e) => setRemarks(prev => ({...prev, [process.id]: e.target.value}))}
                             />
-                            <Label htmlFor={`complete-${process.id}`} className="font-semibold text-green-600">
-                                Mark as Complete
-                            </Label>
+                          ) : process.remarks && (
+                            <p className="text-sm text-muted-foreground border-l-2 pl-2">
+                              <strong>Note:</strong> {process.remarks}
+                            </p>
+                          )}
                         </div>
-                      </>
-                    )}
-                  </CardFooter>
-                )}
-              </Card>
-            </div>
-          );
-        })}
+                      )}
+
+                      { (process.status === 'Completed' || process.status === 'Rejected') && (
+                        <div className='text-sm space-y-1 text-muted-foreground'>
+                          {isQcProcess ? (
+                            <>
+                              <p>Quantity In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>
+                              <p>Quantity Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>
+                            </>
+                          ) : (
+                            <p>Launched Panels: <span className='font-medium text-foreground'>{process.launchedPanels}</span></p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                  
+                  {canUpdate && (
+                    <CardFooter className="flex justify-end items-center gap-4">
+                      {process.status === 'Pending' && (
+                        <Button onClick={() => handleStartProcess(process)}>
+                          <Play className="mr-2 h-4 w-4" /> Start
+                        </Button>
+                      )}
+                      {process.status === 'In Progress' && (
+                        <>
+                          <Button variant="destructive" size="sm" onClick={() => openUpdateDialog(process, 'Rejected')}>
+                            <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
+                          </Button>
+                          <div className="flex items-center space-x-2">
+                              <Checkbox
+                                  id={`complete-${process.id}`}
+                                  onCheckedChange={(checked) => {
+                                  if (checked) {
+                                      openUpdateDialog(process, 'Completed');
+                                  }
+                                  }}
+                                  checked={false} // Should not remain checked
+                              />
+                              <Label htmlFor={`complete-${process.id}`} className="font-semibold text-green-600">
+                                  Mark as Complete
+                              </Label>
+                          </div>
+                        </>
+                      )}
+                    </CardFooter>
+                  )}
+                </Card>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+      <ProcessUpdateDialog 
+        updateInfo={updateInfo} 
+        onOpenChange={() => setUpdateInfo(null)}
+        onSubmit={handleUpdateStatus}
+        remarks={updateInfo ? (remarks[updateInfo.process.id] || '') : ''}
+        onRemarksChange={(remark) => updateInfo && setRemarks(prev => ({...prev, [updateInfo.process.id]: remark}))}
+      />
+    </>
   );
 }
