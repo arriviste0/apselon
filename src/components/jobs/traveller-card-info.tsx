@@ -37,6 +37,8 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
             <InfoItem label="SQ.MT" value={job.sqMt} />
             <InfoItem label="1PNL Hole" value={job.pnlHole} />
             <InfoItem label="Total Hole" value={job.totalHole} />
+            <InfoItem label="Repeat Job" value={job.isRepeat ? 'Yes' : 'No'} />
+            <InfoItem label="Layers" value={job.layerType} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">

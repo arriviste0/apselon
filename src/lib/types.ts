@@ -17,6 +17,8 @@ export interface Job {
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   poNo: string;
   poDate: string;
+  isRepeat: boolean;
+  layerType: 'Single' | 'Double';
   leadTime: string;
   refNo: string;
   launchedPcbs: number;

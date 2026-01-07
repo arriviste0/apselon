@@ -55,6 +55,8 @@ let jobs: Job[] = [
     priority: 'High',
     poNo: "WHATSAPP",
     poDate: "2026-01-03",
+    isRepeat: true,
+    layerType: 'Double',
     leadTime: "5 DAY",
     refNo: "6",
     launchedPcbs: 768,

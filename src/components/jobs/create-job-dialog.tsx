@@ -48,9 +48,12 @@ import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 
 const formSchema = z.object({
+  isRepeat: z.boolean().default(false),
+  layerType: z.enum(['Single', 'Double']).default('Double'),
   jobId: z.string().min(1, 'Job No. is required'),
   refNo: z.string().optional(),
   customerName: z.string().min(1, 'Customer name is required'),
@@ -109,6 +112,8 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+        isRepeat: false,
+        layerType: 'Double',
         jobId: "",
         refNo: "",
         customerName: "",
@@ -200,6 +205,56 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <ScrollArea className="h-[70vh] pr-6">
+            <div className="space-y-6">
+
+            <div className="flex items-center space-x-8">
+              <FormField
+                control={form.control}
+                name="isRepeat"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">
+                      Is this a repeat job?
+                    </FormLabel>
+                  </FormItem>
+              )} />
+              <FormField
+                control={form.control}
+                name="layerType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Number of Layers</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex items-center space-x-4"
+                      >
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="Single" />
+                          </FormControl>
+                          <FormLabel className="font-normal">Single Sided</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="Double" />
+                          </FormControl>
+                          <FormLabel className="font-normal">Double Sided</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+              )} />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
             
             {/* Column 1 */}
@@ -373,6 +428,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   </FormItem>
                 )}
               />
+            </div>
             </div>
             </div>
             </ScrollArea>
