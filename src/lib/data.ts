@@ -47,7 +47,7 @@ let processes: Process[] = [
 
 let jobs: Job[] = [
   {
-    jobId: 'A2511',
+    jobId: 'a2511',
     customerName: 'A03 ARVI(VISHAL BHAI)',
     description: 'Custom gear housing for new engine model. Requires high precision machining.',
     partNo: "LL502_R3(LL_WT_503_REV_3)",
@@ -56,7 +56,7 @@ let jobs: Job[] = [
     poNo: "WHATSAPP",
     orderDate: "2026-01-03",
     isRepeat: true,
-    layerType: 'Double',
+    layerType: 'Double Layer (D/S)',
     leadTime: "5 DAY",
     refNo: "6",
     launchedPcbs: 768,
@@ -73,8 +73,8 @@ let jobs: Job[] = [
     panelSizeWidth: 335,
     panelSizeHeight: 522,
     upsPanel: 24,
-    material: "D/S FR4",
-    copperWeight: "18/18",
+    material: "FR4",
+    copperWeight: "H/H (18/18)",
     thickness: 1.60,
     source: "Any",
     ink: "Any",
@@ -82,7 +82,7 @@ let jobs: Job[] = [
     solderMask: "GREEN",
     legendColour: "WHITE",
     legendSide: "BOTH",
-    surfaceFinish: "HAL",
+    surfaceFinish: "HASL",
     vGrooving: true,
     cutting: "M-Cutting",
     mTraceSetup: "SETUP",
@@ -95,13 +95,17 @@ let jobs: Job[] = [
     dueDate: formatISO(addDays(new Date(), 10)),
     createdAt: formatISO(subDays(new Date(), 5)),
     status: 'In Progress',
+    testingRequired: 'Normal BBT',
+    preparedBy: 'Ashutosh Vyas',
   },
 ];
 
+type JobProcessStatus = 'Pending' | 'In Progress' | 'Completed' | 'Rejected';
+
 let jobProcesses: JobProcess[] = [
   // Job 1
-  { id: 'jp-1-1', jobId: 'A2511', processId: 'proc-1', assignedTo: 'user-2', status: 'In Progress', startTime: formatISO(subDays(new Date(), 5)), endTime: null, remarks: 'Initial design approved.' },
-  ...processes.slice(1).map(p => ({ id: `jp-1-${p.sequenceNumber}`, jobId: 'A2511', processId: p.processId, assignedTo: null, status: 'Pending' as JobProcessStatus, startTime: null, endTime: null, remarks: null })),
+  { id: 'jp-1-1', jobId: 'a2511', processId: 'proc-1', assignedTo: 'user-2', status: 'In Progress', startTime: formatISO(subDays(new Date(), 5)), endTime: null, remarks: 'Initial design approved.' },
+  ...processes.slice(1).map(p => ({ id: `jp-1-${p.sequenceNumber}`, jobId: 'a2511', processId: p.processId, assignedTo: null, status: 'Pending' as JobProcessStatus, startTime: null, endTime: null, remarks: null })),
 ];
 
 // Simulate a database with async functions
@@ -114,7 +118,7 @@ export const getJobs = async (): Promise<Job[]> => {
 };
 
 export const getJobById = async (id: string): Promise<Job | undefined> => {
-    return Promise.resolve(jobs.find(j => j.jobId === id));
+    return Promise.resolve(jobs.find(j => j.jobId.toLowerCase() === id.toLowerCase()));
 };
 
 export const getProcesses = async (): Promise<Process[]> => {
@@ -126,7 +130,7 @@ export const getJobProcesses = async (): Promise<JobProcess[]> => {
 };
 
 export const getJobProcessesByJobId = async (jobId: string): Promise<JobProcess[]> => {
-    return Promise.resolve(jobProcesses.filter(jp => jp.jobId === jobId));
+    return Promise.resolve(jobProcesses.filter(jp => jp.jobId.toLowerCase() === jobId.toLowerCase()));
 };
 
 
@@ -134,11 +138,31 @@ export const getJobProcessesByJobId = async (jobId: string): Promise<JobProcess[
 export const addJob = async (jobData: Job): Promise<Job> => {
   const newJob: Job = {
     ...jobData,
+    jobId: jobData.jobId.toLowerCase(),
     createdAt: new Date().toISOString(),
     status: 'In Progress',
   };
   jobs.unshift(newJob); // Add to the beginning
   return Promise.resolve(newJob);
+};
+
+export const updateJob = async (jobData: Job): Promise<Job> => {
+  const jobIndex = jobs.findIndex(j => j.jobId.toLowerCase() === jobData.jobId.toLowerCase());
+  if (jobIndex > -1) {
+    jobs[jobIndex] = jobData;
+    return Promise.resolve(jobData);
+  }
+  throw new Error("Job not found");
+};
+
+export const deleteJob = async (jobId: string): Promise<void> => {
+  const jobIndex = jobs.findIndex(j => j.jobId.toLowerCase() === jobId.toLowerCase());
+  if (jobIndex > -1) {
+    jobs.splice(jobIndex, 1);
+    // Also delete associated job processes
+    jobProcesses = jobProcesses.filter(jp => jp.jobId.toLowerCase() !== jobId.toLowerCase());
+  }
+  return Promise.resolve();
 };
 
 export const addJobProcesses = async (processesData: JobProcess[]): Promise<void> => {

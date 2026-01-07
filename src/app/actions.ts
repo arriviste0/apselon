@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { addJob, addJobProcesses, getProcesses } from '@/lib/data';
+import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob } from '@/lib/data';
 import { Job, JobWithProcesses, JobProcess } from '@/lib/types';
 
 export async function createJobAction(data: Job): Promise<JobWithProcesses> {
@@ -22,8 +22,25 @@ export async function createJobAction(data: Job): Promise<JobWithProcesses> {
   await addJobProcesses(jobProcesses);
   
   revalidatePath('/');
+  revalidatePath('/master');
   return { ...job, processes: jobProcesses };
 }
+
+export async function updateJobAction(data: Job): Promise<Job> {
+    const job = await updateJob(data);
+    revalidatePath('/');
+    revalidatePath(`/jobs/${job.jobId}`);
+    revalidatePath('/master');
+    return job;
+}
+
+export async function deleteJobAction(jobId: string): Promise<{ success: boolean }> {
+    await deleteJob(jobId);
+    revalidatePath('/');
+    revalidatePath('/master');
+    return { success: true };
+}
+
 
 interface UpdateProcessStatusData {
     jobId: string;

@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { JobWithProcesses, Process } from '@/lib/types';
 import {
@@ -21,9 +22,11 @@ import { format, parseISO } from 'date-fns';
 interface JobListItemProps {
   job: JobWithProcesses;
   processes: Process[];
+  onEdit: (job: JobWithProcesses) => void;
+  onDelete: (jobId: string) => void;
 }
 
-export function JobListItem({ job, processes }: JobListItemProps) {
+export function JobListItem({ job, processes, onEdit, onDelete }: JobListItemProps) {
   const completedProcesses = job.processes.filter(
     (p) => p.status === 'Completed'
   ).length;
@@ -81,8 +84,13 @@ export function JobListItem({ job, processes }: JobListItemProps) {
             <DropdownMenuItem asChild>
               <Link href={`/jobs/${job.jobId}`}>View Details</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>Edit Job</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem onClick={() => onEdit(job)}>
+              Edit Job
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={() => onDelete(job.jobId)}
+            >
               Delete Job
             </DropdownMenuItem>
           </DropdownMenuContent>

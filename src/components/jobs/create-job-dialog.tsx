@@ -38,14 +38,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { CalendarIcon, PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { User, Process, JobWithProcesses, Job } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
 import { ScrollArea } from '../ui/scroll-area';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { getJobs } from '@/lib/data';
 import {
   Command,
@@ -112,24 +111,37 @@ interface CreateJobDialogProps {
   users: User[];
   processes: Process[];
   onJobCreated: (newJob: JobWithProcesses) => void;
+  onJobUpdated: (updatedJob: JobWithProcesses) => void;
+  jobToEdit?: JobWithProcesses;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDialogProps) {
-  const [open, setOpen] = React.useState(false);
+export function CreateJobDialog({ 
+  users, 
+  processes, 
+  onJobCreated,
+  onJobUpdated,
+  jobToEdit,
+  isOpen,
+  onOpenChange,
+}: CreateJobDialogProps) {
   const { toast } = useToast();
   const [allJobs, setAllJobs] = React.useState<Job[]>([]);
   const [comboboxOpen, setComboboxOpen] = React.useState(false);
   const [selectedJobId, setSelectedJobId] = React.useState('');
   
+  const isEditing = !!jobToEdit;
+
   React.useEffect(() => {
     async function fetchJobs() {
         const jobs = await getJobs();
         setAllJobs(jobs);
     }
-    if (open) {
+    if (isOpen) {
         fetchJobs();
     }
-  }, [open]);
+  }, [isOpen]);
 
   const defaultFormValues = {
         isRepeat: false,
@@ -184,8 +196,24 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: defaultFormValues,
+    defaultValues: isEditing ? {
+        ...jobToEdit,
+        dueDate: parseISO(jobToEdit!.dueDate),
+        orderDate: parseISO(jobToEdit!.orderDate),
+    } : defaultFormValues,
   });
+  
+  React.useEffect(() => {
+    if (isEditing && jobToEdit) {
+        form.reset({
+            ...jobToEdit,
+            dueDate: parseISO(jobToEdit.dueDate),
+            orderDate: parseISO(jobToEdit.orderDate),
+        });
+    } else {
+        form.reset(defaultFormValues);
+    }
+  }, [isEditing, jobToEdit, form]);
 
   const isRepeatJob = form.watch('isRepeat');
   
@@ -196,15 +224,15 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         const { 
             createdAt, 
             status,
-            dueDate,
-            orderDate,
+            // Fields to be cleared/reset
             leadTime,
+            dueDate,
             poNo,
+            orderDate,
             quantity,
             launchedPcbs,
             launchedPanels,
-            mTraceSetup,
-            oneP,
+            // Keep the rest
             ...jobDataToCopy 
         } = foundJob;
         
@@ -212,10 +240,10 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             ...jobDataToCopy,
             isRepeat: true,
             // Reset fields that should be re-entered
-            dueDate: new Date(),
-            orderDate: new Date(),
             leadTime: "",
+            dueDate: new Date(),
             poNo: "WHATS APP",
+            orderDate: new Date(),
             quantity: 0,
             launchedPcbs: 0,
             launchedPanels: 0,
@@ -229,31 +257,45 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     }
   };
 
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const jobData: Job = {
-          ...values,
-          dueDate: format(values.dueDate, 'yyyy-MM-dd'),
-          orderDate: format(values.orderDate, 'yyyy-MM-dd'),
-          createdAt: new Date().toISOString(),
-          status: 'In Progress',
-      };
+      if (isEditing) {
+          // This is a mock update. In a real app, you'd call an update action.
+          const updatedJob: JobWithProcesses = {
+            ...jobToEdit!,
+            ...values,
+            dueDate: format(values.dueDate, 'yyyy-MM-dd'),
+            orderDate: format(values.orderDate, 'yyyy-MM-dd'),
+          };
+          onJobUpdated(updatedJob);
+          toast({
+            title: 'Success!',
+            description: `Job ${updatedJob.jobId.toUpperCase()} has been updated.`,
+          });
+      } else {
+        const jobData: Job = {
+            ...values,
+            dueDate: format(values.dueDate, 'yyyy-MM-dd'),
+            orderDate: format(values.orderDate, 'yyyy-MM-dd'),
+            createdAt: new Date().toISOString(),
+            status: 'In Progress',
+        };
 
-      const newJobWithProcesses = await createJobAction(jobData);
-
-      toast({
-        title: 'Success!',
-        description: `Job ${newJobWithProcesses.jobId.toUpperCase()} has been created.`,
-      });
-      onJobCreated(newJobWithProcesses);
-      setOpen(false);
+        const newJobWithProcesses = await createJobAction(jobData);
+        onJobCreated(newJobWithProcesses);
+        toast({
+          title: 'Success!',
+          description: `Job ${newJobWithProcesses.jobId.toUpperCase()} has been created.`,
+        });
+      }
+      
+      onOpenChange(false);
       form.reset(defaultFormValues);
       setSelectedJobId('');
     } catch (error) {
         toast({
             title: 'Error',
-            description: 'Failed to create job. Please try again.',
+            description: 'Failed to save job. Please try again.',
             variant: 'destructive',
         });
     }
@@ -261,25 +303,31 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
   
   const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
 
+  const dialogTitle = isEditing ? `Edit Job ${jobToEdit?.jobId.toUpperCase()}` : 'Create New Job (Traveller Card)';
+  const dialogDescription = isEditing ? 'Update the details for this job.' : 'Fill in the details from the traveller card to create a new job.';
+  const buttonText = isEditing ? 'Save Changes' : 'Create Job';
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) {
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        onOpenChange(open);
+        if (!open) {
             form.reset(defaultFormValues);
             setSelectedJobId('');
         }
     }}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Create Job
-        </Button>
-      </DialogTrigger>
+      {!isEditing && (
+        <DialogTrigger asChild>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create Job
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Create New Job (Traveller Card)</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            Fill in the details from the traveller card to create a new job.
+            {dialogDescription}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -303,6 +351,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                                 setSelectedJobId('');
                             }
                         }}
+                        disabled={isEditing}
                       />
                     </FormControl>
                     <FormLabel className="font-normal">
@@ -332,7 +381,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
               )} />
             </div>
 
-            {isRepeatJob && (
+            {isRepeatJob && !isEditing && (
                 <div className="p-4 border rounded-lg bg-muted/50">
                     <FormLabel>Find Existing Job to Copy</FormLabel>
                      <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
@@ -387,7 +436,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Job Info</h3>
                  <FormField control={form.control} name="jobId" render={({ field }) => (
-                    <FormItem><FormLabel>Job No.</FormLabel><FormControl><Input placeholder="A2511" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Job No.</FormLabel><FormControl><Input placeholder="A2511" {...field} disabled={isEditing || isRepeatJob} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="refNo" render={({ field }) => (
                     <FormItem><FormLabel>Ref. No</FormLabel><FormControl><Input placeholder="6" {...field} /></FormControl><FormMessage /></FormItem>
@@ -736,7 +785,9 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
             </div>
             </ScrollArea>
             <DialogFooter className="pt-4">
-                <Button type="submit">Create Job</Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Saving...' : buttonText}
+                </Button>
             </DialogFooter>
           </form>
         </Form>
