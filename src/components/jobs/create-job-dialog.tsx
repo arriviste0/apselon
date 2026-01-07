@@ -167,7 +167,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         surfaceFinish: "HAL",
         vGrooving: false,
         cutting: "M-Cutting",
-        mTraceSetup: "",
+        mTraceSetup: "SETUP",
         oneP: "",
         sheetSizeWidth: 0,
         sheetSizeHeight: 0,
@@ -185,7 +185,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     const foundJob = allJobs.find(job => job.jobId === jobId);
 
     if (foundJob) {
-        const { createdAt, status, mTraceSetup, oneP, ...jobDataToCopy } = foundJob;
+        const { createdAt, status, ...jobDataToCopy } = foundJob;
         
         form.reset({
             ...jobDataToCopy,
