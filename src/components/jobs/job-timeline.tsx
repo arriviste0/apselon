@@ -146,13 +146,14 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
     const processDef = allProcesses.find(p => p.processId === process.processId);
     if (!processDef) return;
 
-    const previousProcess = allProcesses
-      .filter(p => p.sequenceNumber < processDef.sequenceNumber)
-      .sort((a,b) => b.sequenceNumber - a.sequenceNumber)
-      .map(p => jobProcesses.find(jp => jp.processId === p.processId))
+    const previousProcessJob = jobProcesses
+      .map(jp => ({ jp, pDef: allProcesses.find(p => p.processId === jp.processId)! }))
+      .filter(({ pDef }) => pDef.sequenceNumber < processDef.sequenceNumber)
+      .sort((a, b) => b.pDef.sequenceNumber - a.pDef.sequenceNumber)
+      .map(({ jp }) => jp)
       .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
       
-    const lastQuantity = previousProcess?.quantityOut ?? previousProcess?.launchedPanels ?? process.quantityIn ?? null;
+    const lastQuantity = previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null;
 
     setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities });
   };
@@ -167,6 +168,22 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
           {allProcesses.map((processDef) => {
             const process = jobProcesses.find((p) => p.processId === processDef.processId);
             if (!process) return null;
+
+            const previousProcessJob = jobProcesses
+              .map(jp => ({ jp, pDef: allProcesses.find(p => p.processId === jp.processId)! }))
+              .filter(({ pDef }) => pDef.sequenceNumber < processDef.sequenceNumber)
+              .sort((a, b) => b.pDef.sequenceNumber - a.pDef.sequenceNumber)
+              .map(({ jp }) => jp)
+              .find(jp => jp && (jp.status === 'Completed' || jp.status === 'Rejected'));
+
+            let previousPendingQty = null;
+            if (previousProcessJob) {
+                const { quantityIn, quantityOut } = previousProcessJob;
+                if(typeof quantityIn === 'number' && typeof quantityOut === 'number') {
+                    previousPendingQty = quantityIn - quantityOut;
+                }
+            }
+
 
             const assignedUser = users.find((u) => u.id === process.assignedTo);
             const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
@@ -250,9 +267,11 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
                       )}
                       {process.status === 'In Progress' && (
                         <>
-                           <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
-                            <RefreshCw className="mr-2 h-4 w-4" /> Rework
-                          </Button>
+                           {(previousPendingQty ?? 0) > 0 && (
+                             <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress', { in: 1, out: 1 })}>
+                                <RefreshCw className="mr-2 h-4 w-4" /> Rework
+                             </Button>
+                           )}
                           <Button variant="destructive" size="sm" onClick={() => openUpdateDialog(process, 'Rejected')}>
                             <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
                           </Button>
