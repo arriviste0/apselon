@@ -131,135 +131,6 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
     }
   }, [open]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-        isRepeat: false,
-        layerType: 'Double Layer (D/S)',
-        jobId: "",
-        refNo: "",
-        customerName: "",
-        leadTime: "",
-        partNo: "",
-        poNo: "WHATS APP",
-        quantity: 0,
-        launchedPcbs: 0,
-        launchedPanels: 0,
-        sqMt: 0,
-        pnlHole: 0,
-        totalHole: 0,
-        pcbSizeWidth: 0,
-        pcbSizeHeight: 0,
-        arraySizeWidth: 0,
-        arraySizeHeight: 0,
-        upsArrayWidth: 0,
-        upsArrayHeight: 0,
-        panelSizeWidth: 0,
-        panelSizeHeight: 0,
-        upsPanel: 0,
-        material: "FR4",
-        copperWeight: "H/H (18/18)",
-        thickness: 1.6,
-        source: "Any",
-        ink: "Any",
-        ulLogo: false,
-        solderMask: "GREEN",
-        legendColour: "WHITE",
-        legendSide: "BOTH",
-        surfaceFinish: "HASL",
-        vGrooving: false,
-        cutting: "M-Cutting",
-        mTraceSetup: "SETUP",
-        oneP: "",
-        sheetSizeWidth: 0,
-        sheetSizeHeight: 0,
-        sheetUtilization: 0,
-        panelsInSheet: 0,
-        supplyInfo: "",
-        description: "",
-        priority: "Medium",
-        testingRequired: 'Normal BBT',
-        preparedBy: 'Ashutosh Vyas',
-    },
-  });
-
-  const isRepeatJob = form.watch('isRepeat');
-  
-  const handleJobSelect = (jobId: string) => {
-    const foundJob = allJobs.find(job => job.jobId === jobId);
-
-    if (foundJob) {
-        const { 
-            createdAt, 
-            status,
-            dueDate,
-            orderDate,
-            leadTime,
-            poNo,
-            quantity,
-            launchedPcbs,
-            launchedPanels,
-            refNo,
-            mTraceSetup,
-            oneP,
-            ...jobDataToCopy 
-        } = foundJob;
-        
-        form.reset({
-            ...form.getValues(), // keep current form values, especially isRepeat
-            ...jobDataToCopy,
-            isRepeat: true,
-            // Reset fields that should be re-entered
-            dueDate: new Date(),
-            orderDate: new Date(),
-            leadTime: "",
-            poNo: "",
-            quantity: 0,
-            launchedPcbs: 0,
-            launchedPanels: 0,
-            refNo: "",
-            mTraceSetup: "", // Reset this field
-            oneP: "", // Reset this field
-        });
-
-        toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
-        setSelectedJobId(jobId);
-        setComboboxOpen(false);
-    }
-  };
-
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      const jobData: Job = {
-          ...values,
-          dueDate: format(values.dueDate, 'yyyy-MM-dd'),
-          orderDate: format(values.orderDate, 'yyyy-MM-dd'),
-          createdAt: new Date().toISOString(),
-          status: 'In Progress',
-      };
-
-      const newJobWithProcesses = await createJobAction(jobData);
-
-      toast({
-        title: 'Success!',
-        description: `Job ${newJobWithProcesses.jobId.toUpperCase()} has been created.`,
-      });
-      onJobCreated(newJobWithProcesses);
-      setOpen(false);
-      form.reset();
-      setSelectedJobId('');
-    } catch (error) {
-        toast({
-            title: 'Error',
-            description: 'Failed to create job. Please try again.',
-            variant: 'destructive',
-        });
-    }
-  }
-  
-  const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
-
   const defaultFormValues = {
         isRepeat: false,
         layerType: 'Double Layer (D/S)',
@@ -304,10 +175,91 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
         panelsInSheet: 0,
         supplyInfo: "",
         description: "",
-        priority: "Medium",
+        priority: "Medium" as const,
         testingRequired: 'Normal BBT',
         preparedBy: 'Ashutosh Vyas',
+        dueDate: new Date(),
+        orderDate: new Date(),
     };
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: defaultFormValues,
+  });
+
+  const isRepeatJob = form.watch('isRepeat');
+  
+  const handleJobSelect = (jobId: string) => {
+    const foundJob = allJobs.find(job => job.jobId === jobId);
+
+    if (foundJob) {
+        const { 
+            createdAt, 
+            status,
+            dueDate,
+            orderDate,
+            leadTime,
+            poNo,
+            quantity,
+            launchedPcbs,
+            launchedPanels,
+            mTraceSetup,
+            oneP,
+            ...jobDataToCopy 
+        } = foundJob;
+        
+        form.reset({
+            ...jobDataToCopy,
+            isRepeat: true,
+            // Reset fields that should be re-entered
+            dueDate: new Date(),
+            orderDate: new Date(),
+            leadTime: "",
+            poNo: "WHATS APP",
+            quantity: 0,
+            launchedPcbs: 0,
+            launchedPanels: 0,
+            mTraceSetup: "", // Reset this field
+            oneP: "", // Reset this field
+        });
+
+        toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
+        setSelectedJobId(jobId);
+        setComboboxOpen(false);
+    }
+  };
+
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      const jobData: Job = {
+          ...values,
+          dueDate: format(values.dueDate, 'yyyy-MM-dd'),
+          orderDate: format(values.orderDate, 'yyyy-MM-dd'),
+          createdAt: new Date().toISOString(),
+          status: 'In Progress',
+      };
+
+      const newJobWithProcesses = await createJobAction(jobData);
+
+      toast({
+        title: 'Success!',
+        description: `Job ${newJobWithProcesses.jobId.toUpperCase()} has been created.`,
+      });
+      onJobCreated(newJobWithProcesses);
+      setOpen(false);
+      form.reset(defaultFormValues);
+      setSelectedJobId('');
+    } catch (error) {
+        toast({
+            title: 'Error',
+            description: 'Failed to create job. Please try again.',
+            variant: 'destructive',
+        });
+    }
+  }
+  
+  const selectedJobDisplayValue = allJobs.find(job => job.jobId === selectedJobId);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -460,7 +412,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 <FormField control={form.control} name="poNo" render={({ field }) => (
                    <FormItem>
                       <FormLabel>P.O. Number</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a P.O. type" />
@@ -545,7 +497,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
               <FormField control={form.control} name="material" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Material Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select material" /></SelectTrigger>
                         </FormControl>
@@ -560,7 +512,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
               <FormField control={form.control} name="copperWeight" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Copper Thickness (oz)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select copper thickness" /></SelectTrigger>
                         </FormControl>
@@ -609,7 +561,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                 <FormField control={form.control} name="solderMask" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Masking Colour</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
                         </FormControl>
@@ -627,7 +579,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                  <FormField control={form.control} name="legendColour" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Legend Colour</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select color" /></SelectTrigger>
                         </FormControl>
@@ -643,7 +595,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                  <FormField control={form.control} name="legendSide" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Legend Side</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select side" /></SelectTrigger>
                         </FormControl>
@@ -660,7 +612,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                  <FormField control={form.control} name="surfaceFinish" render={({ field }) => (
                    <FormItem>
                       <FormLabel>Surface Finish</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select finish" /></SelectTrigger>
                         </FormControl>
@@ -682,7 +634,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Cutting</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a cutting method" />
@@ -709,7 +661,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Testing Required</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select testing type" />
@@ -731,7 +683,7 @@ export function CreateJobDialog({ users, processes, onJobCreated }: CreateJobDia
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Prepared By</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select preparer" />
