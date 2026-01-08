@@ -79,11 +79,12 @@ export default function JobDetailsClient({
           <TabsTrigger value="traveller-card">Traveller Card</TabsTrigger>
         </TabsList>
         <TabsContent value="timeline" className="mt-6">
-            <JobTimeline 
+            <JobTimeline
                 jobId={job.jobId}
-                jobProcesses={jobProcesses} 
+                job={job}
+                jobProcesses={jobProcesses}
                 allProcesses={allProcesses}
-                users={users} 
+                users={users}
                 currentUser={currentUser}
                 onProcessUpdate={handleProcessUpdate}
             />

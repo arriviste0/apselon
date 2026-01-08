@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { JobProcess, Process, User } from '@/lib/types';
+import { Job, JobProcess, Process, User } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import {
 
 interface JobTimelineProps {
   jobId: string;
+  job: Job;
   jobProcesses: JobProcess[];
   allProcesses: Process[];
   users: User[];
@@ -57,7 +58,7 @@ const calculatePending = (process: JobProcess): number | null => {
   return process.quantityIn - (process.quantityOut || 0) - (process.reworkQuantityOut || 0);
 };
 
-export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentUser, onProcessUpdate }: JobTimelineProps) {
+export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, currentUser, onProcessUpdate }: JobTimelineProps) {
   const { toast } = useToast();
   const [remarks, setRemarks] = React.useState<Record<string, string>>({});
   const [updateInfo, setUpdateInfo] = React.useState<ProcessUpdateInfo | null>(null);
@@ -195,10 +196,14 @@ export function JobTimeline({ jobId, jobProcesses, allProcesses, users, currentU
       .map(({ jp }) => jp)
       .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
       
-    const lastQuantity = isRework ? (pendingQty ?? 0) : (previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null);
+    let lastQuantity = isRework ? (pendingQty ?? 0) : (previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null);
+    const processesUsingPCBs = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
+    if (processesUsingPCBs.includes(processDef.processName) && lastQuantity !== null) {
+      lastQuantity = lastQuantity * (job.upsPanel ?? 1);
+    }
     const prefillQuantities = isRework ? { originalOut: process.quantityOut ?? 0, pending: pendingQty ?? 0 } : undefined;
 
-    setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities });
+    setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities, upsPanel: job.upsPanel });
   };
   
   return (

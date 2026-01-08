@@ -33,6 +33,7 @@ export interface ProcessUpdateInfo {
   newStatus: 'Completed' | 'Rejected' | 'In Progress';
   lastQuantity: number | null;
   prefillQuantities?: { in: number; out: number } | { originalOut: number; pending: number };
+  upsPanel?: number;
 }
 
 interface ProcessUpdateDialogProps {
@@ -76,7 +77,7 @@ export function ProcessUpdateDialog({
     }
   });
 
-  const isRework = React.useMemo(() => updateInfo?.newStatus === 'In Progress' && updateInfo.process.status !== 'Pending', [updateInfo]);
+  const isRework = React.useMemo(() => updateInfo ? updateInfo.newStatus === 'In Progress' && updateInfo.process.status !== 'Pending' : false, [updateInfo]);
 
   React.useEffect(() => {
     if (updateInfo) {
@@ -100,10 +101,13 @@ export function ProcessUpdateDialog({
       onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
     }
   };
-  
-  const isOpen = !!updateInfo;
-  const processName = updateInfo?.processDef.processName;
+
+  const processName = updateInfo?.processDef?.processName || '';
   const status = updateInfo?.newStatus;
+
+  const processesUsingPCBs = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
+  const unitName = processesUsingPCBs.includes(processName) ? 'PCBs' : 'panels';
+  const displayedQuantity = updateInfo && processesUsingPCBs.includes(processName) && updateInfo.lastQuantity ? updateInfo.lastQuantity * (updateInfo.upsPanel ?? 1) : updateInfo?.lastQuantity;
 
   const getTitle = () => {
     if (isRework) return `Rework: ${processName}`;
@@ -116,8 +120,8 @@ export function ProcessUpdateDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={!!updateInfo} onOpenChange={onOpenChange}>
+      {updateInfo && <DialogContent>
         <DialogHeader>
           <DialogTitle>{getTitle()}</DialogTitle>
           <DialogDescription>
@@ -127,14 +131,14 @@ export function ProcessUpdateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {updateInfo?.lastQuantity !== null && !isRework && (
-             <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                    Previous process output was <span className="font-semibold">{updateInfo?.lastQuantity}</span> panels. This has been pre-filled as the IN quantity.
-                </AlertDescription>
-            </Alert>
-        )}
+        {displayedQuantity !== null && !isRework && (
+              <Alert>
+                 <Info className="h-4 w-4" />
+                 <AlertDescription>
+                     Previous process output was <span className="font-semibold">{displayedQuantity}</span> {unitName}. This has been pre-filled as the IN quantity.
+                 </AlertDescription>
+             </Alert>
+         )}
         
         {isRework && (
               <Alert>
@@ -231,7 +235,7 @@ export function ProcessUpdateDialog({
             </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }
