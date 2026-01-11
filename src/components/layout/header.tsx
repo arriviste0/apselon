@@ -9,9 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User } from '@/lib/types';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { useUser } from '@/components/user/user-provider';
 import Link from 'next/link';
@@ -23,9 +21,6 @@ interface HeaderProps {
 export function Header({ currentUser }: HeaderProps) {
   const { user: activeUser, logout } = useUser();
   const displayUser = activeUser ?? currentUser;
-  const userAvatar =
-    PlaceHolderImages.find((img) => img.id === 'user-avatar-1')?.imageUrl ||
-    'https://avatar.vercel.sh/fallback.png';
 
   const userInitials = displayUser?.name
     .split(' ')
@@ -47,11 +42,11 @@ export function Header({ currentUser }: HeaderProps) {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={userAvatar} alt={displayUser?.name || 'User'} data-ai-hint="person portrait" />
-                  <AvatarFallback>{userInitials}</AvatarFallback>
-                </Avatar>
+              <Button
+                variant="ghost"
+                className="relative h-9 min-w-9 rounded-full px-3 text-sm font-semibold"
+              >
+                {userInitials || 'U'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
