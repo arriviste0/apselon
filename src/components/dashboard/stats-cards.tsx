@@ -19,7 +19,7 @@ export function StatsCards({ jobs }: StatsCardsProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
           <Briefcase className="h-4 w-4 text-muted-foreground" />
@@ -28,7 +28,7 @@ export function StatsCards({ jobs }: StatsCardsProps) {
           <div className="text-2xl font-bold">{stats.total}</div>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">In Progress</CardTitle>
           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -37,7 +37,7 @@ export function StatsCards({ jobs }: StatsCardsProps) {
           <div className="text-2xl font-bold">{stats.inProgress}</div>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Completed</CardTitle>
           <CheckCircle className="h-4 w-4 text-muted-foreground" />
@@ -46,7 +46,7 @@ export function StatsCards({ jobs }: StatsCardsProps) {
           <div className="text-2xl font-bold">{stats.completed}</div>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Overdue</CardTitle>
           <AlertTriangle className="h-4 w-4 text-destructive" />

@@ -39,14 +39,13 @@ import { useToast } from '@/hooks/use-toast';
 import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
 import { ScrollArea } from '../ui/scroll-area';
-import { getJobs } from '@/lib/data';
 
 
 const formSchema = z.object({
   isRepeat: z.boolean().default(false),
   layerType: z.string().default('Double Layer (D/S)'),
   jobId: z.string().trim().min(1, 'Job No. is required'),
-  refNo: z.string().optional(),
+  refNo: z.string().min(1, 'Ref. No is required'),
   customerName: z.string().min(1, 'Customer name is required'),
   leadTime: z.string().optional(),
   partNo: z.string().min(1, 'Part No. is required'),
@@ -121,8 +120,16 @@ export function CreateJobDialog({
 
   React.useEffect(() => {
     async function fetchJobs() {
-        const jobs = await getJobs();
-        setAllJobs(jobs);
+        try {
+          const response = await fetch('/api/jobs');
+          if (!response.ok) {
+            throw new Error('Failed to load jobs');
+          }
+          const jobs: Job[] = await response.json();
+          setAllJobs(jobs);
+        } catch (error) {
+          setAllJobs([]);
+        }
     }
     if (isOpen) {
         fetchJobs();
@@ -204,6 +211,77 @@ export function CreateJobDialog({
   }, [isEditing, jobToEdit, form]);
 
   const isRepeatJob = form.watch('isRepeat');
+  const leadTimeValue = form.watch('leadTime');
+  const orderDateValue = form.watch('orderDate');
+  const launchedPcbsValue = form.watch('launchedPcbs');
+  const upsPanelValue = form.watch('upsPanel');
+  const pcbWidthValue = form.watch('pcbSizeWidth');
+  const pcbHeightValue = form.watch('pcbSizeHeight');
+  const panelWidthValue = form.watch('panelSizeWidth');
+  const panelHeightValue = form.watch('panelSizeHeight');
+  const launchedPanelsValue = form.watch('launchedPanels');
+  const pnlHoleValue = form.watch('pnlHole');
+  const arrayWidthValue = form.watch('arraySizeWidth');
+  const arrayHeightValue = form.watch('arraySizeHeight');
+  const upsArrayWidthValue = form.watch('upsArrayWidth');
+  const upsArrayHeightValue = form.watch('upsArrayHeight');
+  const mTraceValue = form.watch('mTraceSetup');
+
+  React.useEffect(() => {
+    if (!orderDateValue || !leadTimeValue) return;
+    const match = leadTimeValue.match(/(\d+)/);
+    if (!match) return;
+    const leadDays = Number(match[1]);
+    if (!Number.isFinite(leadDays)) return;
+    const nextDue = new Date(orderDateValue);
+    if (Number.isNaN(nextDue.getTime())) return;
+    nextDue.setDate(nextDue.getDate() + leadDays);
+    form.setValue('dueDate', format(nextDue, 'yyyy-MM-dd'), { shouldValidate: true });
+  }, [leadTimeValue, orderDateValue, form]);
+
+  React.useEffect(() => {
+    const pcbs = typeof launchedPcbsValue === 'number' ? launchedPcbsValue : Number(launchedPcbsValue);
+    const ups = typeof upsPanelValue === 'number' ? upsPanelValue : Number(upsPanelValue);
+    if (!Number.isFinite(pcbs) || !Number.isFinite(ups) || ups <= 0) return;
+    form.setValue('launchedPanels', pcbs / ups, { shouldValidate: true });
+  }, [launchedPcbsValue, upsPanelValue, form]);
+
+  React.useEffect(() => {
+    const pcbs = typeof launchedPcbsValue === 'number' ? launchedPcbsValue : Number(launchedPcbsValue);
+    const width = typeof pcbWidthValue === 'number' ? pcbWidthValue : Number(pcbWidthValue);
+    const height = typeof pcbHeightValue === 'number' ? pcbHeightValue : Number(pcbHeightValue);
+    if (!Number.isFinite(pcbs) || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    const sqm = (width * height * pcbs) / 1000000;
+    form.setValue('launchedPcbSqm', sqm, { shouldValidate: true });
+  }, [launchedPcbsValue, pcbWidthValue, pcbHeightValue, form]);
+
+  React.useEffect(() => {
+    const panels = typeof launchedPanelsValue === 'number' ? launchedPanelsValue : Number(launchedPanelsValue);
+    const width = typeof panelWidthValue === 'number' ? panelWidthValue : Number(panelWidthValue);
+    const height = typeof panelHeightValue === 'number' ? panelHeightValue : Number(panelHeightValue);
+    if (!Number.isFinite(panels) || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    const sqm = (width * height * panels) / 1000000;
+    form.setValue('launchedPanelSqm', sqm, { shouldValidate: true });
+  }, [launchedPanelsValue, panelWidthValue, panelHeightValue, form]);
+
+  React.useEffect(() => {
+    const panels = typeof launchedPanelsValue === 'number' ? launchedPanelsValue : Number(launchedPanelsValue);
+    const holePerPanel = typeof pnlHoleValue === 'number' ? pnlHoleValue : Number(pnlHoleValue);
+    if (!Number.isFinite(panels) || !Number.isFinite(holePerPanel)) return;
+    form.setValue('totalHole', panels * holePerPanel, { shouldValidate: true });
+  }, [launchedPanelsValue, pnlHoleValue, form]);
+
+  React.useEffect(() => {
+    const arrayWidth = typeof arrayWidthValue === 'number' ? arrayWidthValue : Number(arrayWidthValue);
+    const arrayHeight = typeof arrayHeightValue === 'number' ? arrayHeightValue : Number(arrayHeightValue);
+    const upsW = typeof upsArrayWidthValue === 'number' ? upsArrayWidthValue : Number(upsArrayWidthValue);
+    const upsH = typeof upsArrayHeightValue === 'number' ? upsArrayHeightValue : Number(upsArrayHeightValue);
+    const mTrace = typeof mTraceValue === 'number' ? mTraceValue : Number(mTraceValue);
+    if (!Number.isFinite(arrayWidth) || !Number.isFinite(arrayHeight) || !Number.isFinite(upsW) || !Number.isFinite(upsH) || !Number.isFinite(mTrace)) return;
+    if (upsW <= 0 || upsH <= 0) return;
+    const onePValue = (((arrayWidth * arrayHeight) / 100) * mTrace) / (upsW * upsH);
+    form.setValue('oneP', String(onePValue), { shouldValidate: true });
+  }, [arrayWidthValue, arrayHeightValue, upsArrayWidthValue, upsArrayHeightValue, mTraceValue, form]);
   
   const handleJobSelect = (jobId: string) => {
     const foundJob = allJobs.find(job => job.jobId === jobId);
@@ -229,12 +307,13 @@ export function CreateJobDialog({
         form.reset({
             ...jobDataToCopy,
             isRepeat: true,
-            jobId: "", // Reset jobId for new repeat job
+            jobId, // Keep Job No. for repeat job
+            refNo: '', // New Ref. No required for unique identification
             dueDate: format(new Date(), 'yyyy-MM-dd'), // Reset to current date
             orderDate: format(new Date(), 'yyyy-MM-dd'), // Reset to current date
         });
 
-        toast({ title: `Copied details from Job ${foundJob.jobId.toUpperCase()}` });
+        // Removed copy notification per request.
     }
   };
 
@@ -252,8 +331,29 @@ export function CreateJobDialog({
             description: `Job ${updatedJob.jobId.toUpperCase()} has been updated.`,
           });
       } else {
+        const trimmedRef = values.refNo.trim();
+        if (!trimmedRef) {
+          toast({
+            title: 'Ref. No required',
+            description: 'Please enter a reference number.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const duplicateRef = allJobs.some(
+          (job) => job.refNo && job.refNo.toLowerCase() === trimmedRef.toLowerCase()
+        );
+        if (duplicateRef) {
+          toast({
+            title: 'Duplicate Ref. No.',
+            description: 'Please use a unique reference number for this job.',
+            variant: 'destructive',
+          });
+          return;
+        }
         const jobData: Job = {
             ...values,
+            refNo: trimmedRef,
             createdAt: new Date().toISOString(),
             status: 'In Progress',
         };
@@ -297,7 +397,7 @@ export function CreateJobDialog({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="w-[95vw] max-w-6xl">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
@@ -309,7 +409,7 @@ export function CreateJobDialog({
             <ScrollArea className="h-[70vh] pr-6">
             <div className="space-y-6">
 
-            <div className="flex items-center space-x-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <FormField
                 control={form.control}
                 name="isRepeat"
@@ -372,10 +472,10 @@ export function CreateJobDialog({
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
             
             {/* Column 1 */}
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Job Info</h3>
                  <FormField control={form.control} name="jobId" render={({ field }) => (
                     <FormItem><FormLabel>Job No.</FormLabel><FormControl><Input placeholder="A2511" {...field} disabled={isEditing || isRepeatJob} /></FormControl><FormMessage /></FormItem>
@@ -387,13 +487,30 @@ export function CreateJobDialog({
                     <FormItem><FormLabel>Customer</FormLabel><FormControl><Input placeholder="A03 ARVI(VISHAL BHAI)" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="leadTime" render={({ field }) => (
-                    <FormItem><FormLabel>Lead Time</FormLabel><FormControl><Input placeholder="5 DAY" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>Lead Time</FormLabel>
+                      <FormControl><Input placeholder="5 DAY" {...field} /></FormControl>
+                      <p className="text-xs text-muted-foreground">Used to auto-calculate Delivery Date from Issue Date.</p>
+                      <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="orderDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Issue Date</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="partNo" render={({ field }) => (
                     <FormItem><FormLabel>Part No.</FormLabel><FormControl><Input placeholder="LL502_R3" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem><FormLabel>Del Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Delivery Date</FormLabel>
+                    <FormControl><Input type="date" {...field} readOnly /></FormControl>
+                    <p className="text-xs text-muted-foreground">Auto-filled from Issue Date + Lead Time.</p>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="poNo" render={({ field }) => (
                    <FormItem>
@@ -414,36 +531,53 @@ export function CreateJobDialog({
                       <FormMessage />
                     </FormItem>
                 )} />
-                <FormField control={form.control} name="orderDate" render={({ field }) => (
-                  <FormItem><FormLabel>Order Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
                 <FormField control={form.control} name="quantity" render={({ field }) => (
                     <FormItem><FormLabel>Order Qty</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                 <FormField control={form.control} name="launchedPcbs" render={({ field }) => (
+                <FormField control={form.control} name="launchedPcbs" render={({ field }) => (
                     <FormItem><FormLabel>Launched PCBs</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="launchedPanels" render={({ field }) => (
-                    <FormItem><FormLabel>Launched Panels</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>Launched Panels</FormLabel>
+                      <FormControl><Input type="number" {...field} readOnly /></FormControl>
+                      <p className="text-xs text-muted-foreground">Auto-calculated from Launched PCBs / Ups Panel.</p>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                  <FormField control={form.control} name="launchedPcbSqm" render={({ field }) => (
-                    <FormItem><FormLabel>Launch PCB SQM</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>Launch PCB SQM</FormLabel>
+                      <FormControl><Input type="number" step="0.01" {...field} readOnly /></FormControl>
+                      <p className="text-xs text-muted-foreground">Auto-calculated from PCB size and Launched PCBs.</p>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="launchedPanelSqm" render={({ field }) => (
-                    <FormItem><FormLabel>Launch Panel SQM</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>Launch Panel SQM</FormLabel>
+                      <FormControl><Input type="number" step="0.01" {...field} readOnly /></FormControl>
+                      <p className="text-xs text-muted-foreground">Auto-calculated from panel size and Launched Panels.</p>
+                      <FormMessage />
+                    </FormItem>
                 )} />
                  <FormField control={form.control} name="pnlHole" render={({ field }) => (
                     <FormItem><FormLabel>1PNL Hole</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="totalHole" render={({ field }) => (
-                    <FormItem><FormLabel>Total Hole</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                      <FormLabel>Total Hole</FormLabel>
+                      <FormControl><Input type="number" {...field} readOnly /></FormControl>
+                      <p className="text-xs text-muted-foreground">Auto-calculated from 1PNL Hole and Launched Panels.</p>
+                      <FormMessage />
+                    </FormItem>
                 )} />
             </div>
 
             {/* Column 2 */}
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
               <h3 className="text-lg font-semibold border-b pb-2">Dimension & Material</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="pcbSizeWidth" render={({ field }) => (
                   <FormItem><FormLabel>PCB Width</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -451,7 +585,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>PCB Length</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="arraySizeWidth" render={({ field }) => (
                   <FormItem><FormLabel>Array Width</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -459,7 +593,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>Array Length</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="upsArrayWidth" render={({ field }) => (
                   <FormItem><FormLabel>Ups Array W</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -467,7 +601,7 @@ export function CreateJobDialog({
                   <FormItem><FormLabel>Ups Array L</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="panelSizeWidth" render={({ field }) => (
                   <FormItem><FormLabel>Panel Width</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -540,7 +674,7 @@ export function CreateJobDialog({
             </div>
 
             {/* Column 3 */}
-             <div className="space-y-4">
+             <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Instructions & Planning</h3>
                 <FormField control={form.control} name="solderMask" render={({ field }) => (
                   <FormItem>
@@ -688,7 +822,7 @@ export function CreateJobDialog({
                 />
                 
                 <h4 className="text-md font-semibold border-b pb-1 pt-2">CCL Cutting Plan</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="sheetSizeWidth" render={({ field }) => (
                     <FormItem><FormLabel>Sheet Width</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />

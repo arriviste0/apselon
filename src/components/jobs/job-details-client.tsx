@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO, differenceInBusinessDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TravellerCardInfo } from './traveller-card-info';
+import { useUser } from '@/components/user/user-provider';
 
 interface JobDetailsClientProps {
   job: Job;
@@ -24,7 +25,10 @@ export default function JobDetailsClient({
   users,
   currentUser,
 }: JobDetailsClientProps) {
-    const [jobProcesses, setJobProcesses] = React.useState(initialProcesses);
+  const { user: activeUser } = useUser();
+  const displayUser = activeUser ?? currentUser;
+  const jobKey = (job.refNo && job.refNo.trim() ? job.refNo : job.jobId).toLowerCase();
+  const [jobProcesses, setJobProcesses] = React.useState(initialProcesses);
 
     const handleProcessUpdate = (update: JobProcess | JobProcess[]) => {
       if (Array.isArray(update)) {
@@ -47,7 +51,7 @@ export default function JobDetailsClient({
                               ...newProcesses[nextJobProcessIndex],
                               status: 'In Progress',
                               startTime: new Date().toISOString(),
-                              assignedTo: currentUser.id, // Or logic to assign to next department
+                              assignedTo: null,
                           };
                       }
                   }
@@ -59,16 +63,49 @@ export default function JobDetailsClient({
 
   const daysLeft = differenceInBusinessDays(parseISO(job.dueDate), new Date());
 
+  const visibleProcesses = React.useMemo(() => {
+    if (displayUser.role !== 'employee') return allProcesses;
+
+    return allProcesses.filter((processDef) => {
+      const jobProcess = jobProcesses.find((process) => process.processId === processDef.processId);
+      if (!jobProcess) return false;
+      return (
+        processDef.processName === displayUser.department ||
+        jobProcess.assignedTo === displayUser.id
+      );
+    });
+  }, [allProcesses, jobProcesses, displayUser.department, displayUser.id, displayUser.role]);
+
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
+      <Card className="shadow-sm">
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
               <CardTitle className="text-2xl">Job {job.jobId.toUpperCase()}</CardTitle>
               <CardDescription>{job.customerName} - {job.partNo}</CardDescription>
             </div>
-            <Badge variant={job.status === 'Overdue' ? 'destructive' : 'secondary'} className="text-sm">{job.status}</Badge>
+            <Badge variant={job.status === 'Overdue' ? 'destructive' : 'secondary'} className="text-sm">
+              {job.status}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 gap-4 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide">Issue Date</p>
+              <p className="font-medium text-foreground">{format(parseISO(job.orderDate), 'MMM dd, yyyy')}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide">Delivery Date</p>
+              <p className="font-medium text-foreground">{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide">Priority</p>
+              <p className="font-medium text-foreground">{job.priority}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide">Days Left</p>
+              <p className="font-medium text-foreground">{daysLeft}</p>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -79,21 +116,21 @@ export default function JobDetailsClient({
           <TabsTrigger value="traveller-card">Traveller Card</TabsTrigger>
         </TabsList>
         <TabsContent value="timeline" className="mt-6">
-            <JobTimeline
-                jobId={job.jobId}
-                job={job}
-                jobProcesses={jobProcesses}
-                allProcesses={allProcesses}
-                users={users}
-                currentUser={currentUser}
-                onProcessUpdate={handleProcessUpdate}
-            />
+          <JobTimeline
+            jobId={jobKey}
+            job={job}
+            jobProcesses={jobProcesses}
+            allProcesses={allProcesses}
+            displayProcesses={visibleProcesses}
+            users={users}
+            currentUser={displayUser}
+            onProcessUpdate={handleProcessUpdate}
+          />
         </TabsContent>
         <TabsContent value="traveller-card">
-            <TravellerCardInfo job={job} />
+          <TravellerCardInfo job={job} />
         </TabsContent>
       </Tabs>
-      
     </div>
   );
 }

@@ -17,8 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '../ui/label';
 import { ProcessUpdateDialog, type ProcessUpdateInfo } from './process-update-dialog';
 import {
   Dialog,
@@ -34,6 +32,7 @@ interface JobTimelineProps {
   job: Job;
   jobProcesses: JobProcess[];
   allProcesses: Process[];
+  displayProcesses?: Process[];
   users: User[];
   currentUser: User;
   onProcessUpdate: (updatedProcess: JobProcess | JobProcess[]) => void;
@@ -55,14 +54,18 @@ const statusColors = {
 
 const calculatePending = (process: JobProcess): number | null => {
   if (process.quantityIn == null) return null;
-  return process.quantityIn - (process.quantityOut || 0) - (process.reworkQuantityOut || 0);
+  const quantityOut = process.quantityOut || 0;
+  const reworkOut = process.reworkQuantityOut || 0;
+  return process.quantityIn - quantityOut - reworkOut;
 };
 
-export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, currentUser, onProcessUpdate }: JobTimelineProps) {
+export function JobTimeline({ jobId, job, jobProcesses, allProcesses, displayProcesses, users, currentUser, onProcessUpdate }: JobTimelineProps) {
   const { toast } = useToast();
   const [remarks, setRemarks] = React.useState<Record<string, string>>({});
   const [updateInfo, setUpdateInfo] = React.useState<ProcessUpdateInfo | null>(null);
   const [historyProcess, setHistoryProcess] = React.useState<JobProcess | null>(null);
+  const preMaskSequence = allProcesses.find(p => p.processName === 'Pre-Mask Q.C.')?.sequenceNumber ?? null;
+  const processesToRender = displayProcesses ?? allProcesses;
 
   
   const handleUpdateStatus = async (
@@ -75,17 +78,21 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
     const previousProcessesState = [...jobProcesses];
 
     let updatedProcess: JobProcess;
-    const isRework = newStatus === 'In Progress' && process.status !== 'Pending';
+    const processDef = allProcesses.find(p => p.processId === process.processId);
+    const allowRework = preMaskSequence === null ? true : (processDef ? processDef.sequenceNumber < preMaskSequence : true);
+    const isRework = allowRework && newStatus === 'In Progress' && process.status !== 'Pending';
 
-    if (isRework) { // This is a Rework action - remove rework fields and make original out and pending editable
-      const reworkQuantityOut = (process.quantityIn || 0) - (quantityData.quantityOut || 0) - (quantityData.pending || 0);
+    if (isRework) { // Rework action keeps original quantities intact
+      const reworkQuantityIn = quantityData.quantityIn || 0;
+      const reworkQuantityOut = quantityData.quantityOut || 0;
+      const totalReworkIn = (process.reworkQuantityIn || 0) + reworkQuantityIn;
+      const totalReworkOut = (process.reworkQuantityOut || 0) + reworkQuantityOut;
 
       updatedProcess = {
         ...process,
         remarks: remarks[process.id] || process.remarks,
-        quantityOut: quantityData.quantityOut,
-        reworkQuantityIn: 0,
-        reworkQuantityOut: reworkQuantityOut,
+        reworkQuantityIn: totalReworkIn,
+        reworkQuantityOut: totalReworkOut,
       };
 
       // If rework makes pending 0, mark as complete
@@ -102,6 +109,10 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
           remarks: remarks[process.id] || process.remarks,
           ...quantityData,
       };
+      if (!allowRework && updatedProcess.quantityIn !== null && updatedProcess.quantityIn !== undefined) {
+        const diff = (updatedProcess.quantityIn || 0) - (updatedProcess.quantityOut || 0);
+        updatedProcess.rejectQuantity = diff > 0 ? diff : 0;
+      }
     }
 
     onProcessUpdate(updatedProcess);
@@ -114,30 +125,13 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
           remarks: remarks[process.id] || '',
           userId: currentUser.id,
           // For rework we send updated fields, otherwise send normal quantities
-          reworkQuantityIn: isRework ? 0 : undefined,
-          reworkQuantityOut: isRework ? updatedProcess.reworkQuantityOut : undefined,
+          reworkQuantityIn: isRework ? quantityData.quantityIn : undefined,
+          reworkQuantityOut: isRework ? quantityData.quantityOut : undefined,
           quantityIn: !isRework ? quantityData.quantityIn : undefined,
-          quantityOut: isRework ? quantityData.quantityOut : (!isRework ? quantityData.quantityOut : undefined),
+          quantityOut: !isRework ? quantityData.quantityOut : undefined,
         });
 
-        toast({
-            title: `Process Updated`,
-            description: `${allProcesses.find(p => p.processId === process.processId)?.processName} has been updated.`,
-            action: (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  onProcessUpdate(previousProcessesState);
-                  toast({
-                    title: 'Undo successful',
-                    description: 'The process status has been reverted.',
-                  });
-                }}
-              >
-                Undo
-              </Button>
-            ),
-        });
+        // Intentionally suppress success toast to reduce noise in the UI.
     } catch (error) {
         toast({
             title: 'Update failed',
@@ -186,52 +180,98 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
     const processDef = allProcesses.find(p => p.processId === process.processId);
     if (!processDef) return;
 
-    const isRework = newStatus === 'In Progress' && process.status !== 'Pending';
-    const pendingQty = process.status === 'Completed' ? 0 : calculatePending(process);
+    const allowRework = preMaskSequence === null ? true : processDef.sequenceNumber < preMaskSequence;
+    const isRework = allowRework && newStatus === 'In Progress' && process.status !== 'Pending';
+    const pendingQty = allowRework ? (process.status === 'Completed' ? 0 : calculatePending(process)) : null;
+    const processesUsingPCBs = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
+    const currentUsesPcbs = processesUsingPCBs.includes(processDef.processName);
 
-    const previousProcessJob = jobProcesses
+    const previousProcessesWithDef = jobProcesses
       .map(jp => ({ jp, pDef: allProcesses.find(p => p.processId === jp.processId)! }))
       .filter(({ pDef }) => pDef.sequenceNumber < processDef.sequenceNumber)
-      .sort((a, b) => b.pDef.sequenceNumber - a.pDef.sequenceNumber)
-      .map(({ jp }) => jp)
-      .find(jp => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
-      
-    let lastQuantity = isRework ? (pendingQty ?? 0) : (previousProcessJob?.quantityOut ?? previousProcessJob?.launchedPanels ?? process.quantityIn ?? null);
-    const processesUsingPCBs = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
-    if (processesUsingPCBs.includes(processDef.processName) && lastQuantity !== null) {
-      lastQuantity = lastQuantity * (job.upsPanel ?? 1);
+      .sort((a, b) => b.pDef.sequenceNumber - a.pDef.sequenceNumber);
+
+    const previousProcessWithDef = currentUsesPcbs
+      ? previousProcessesWithDef.find(({ jp }) => jp && jp.launchedPanels !== null)
+      : previousProcessesWithDef.find(({ jp }) => jp && (jp.quantityOut !== null || jp.launchedPanels !== null));
+
+    let lastQuantity = isRework ? (pendingQty ?? 0) : null;
+    if (!isRework) {
+      let baseQuantity: number | null = null;
+      let baseUnit: 'pcbs' | 'panels' | null = null;
+
+      const preferLaunchedPanels =
+        currentUsesPcbs &&
+        previousProcessWithDef?.jp.launchedPanels !== null &&
+        previousProcessWithDef?.jp.launchedPanels !== undefined;
+
+      const previousTotalOut =
+        previousProcessWithDef?.jp.quantityOut !== null &&
+        previousProcessWithDef?.jp.quantityOut !== undefined
+          ? previousProcessWithDef.jp.quantityOut + (previousProcessWithDef?.jp.reworkQuantityOut ?? 0)
+          : null;
+
+      if (preferLaunchedPanels) {
+        baseQuantity = previousProcessWithDef.jp.launchedPanels;
+        baseUnit = 'panels';
+      } else if (previousTotalOut !== null) {
+        baseQuantity = previousTotalOut;
+        baseUnit = processesUsingPCBs.includes(previousProcessWithDef.pDef.processName) ? 'pcbs' : 'panels';
+      } else if (previousProcessWithDef?.jp.launchedPanels !== null && previousProcessWithDef?.jp.launchedPanels !== undefined) {
+        baseQuantity = previousProcessWithDef.jp.launchedPanels;
+        baseUnit = 'panels';
+      } else if (process.quantityIn !== null && process.quantityIn !== undefined) {
+        baseQuantity = process.quantityIn;
+        baseUnit = currentUsesPcbs ? 'pcbs' : 'panels';
+      }
+
+      if (baseQuantity !== null && baseUnit !== null) {
+        if ((baseUnit === 'pcbs') === currentUsesPcbs) {
+          lastQuantity = baseQuantity;
+        } else if (baseUnit === 'panels' && currentUsesPcbs) {
+          lastQuantity = baseQuantity * (job.upsPanel ?? 1);
+        } else if (baseUnit === 'pcbs' && !currentUsesPcbs) {
+          const ups = job.upsPanel ?? 1;
+          lastQuantity = ups ? baseQuantity / ups : baseQuantity;
+        }
+      }
     }
-    const prefillQuantities = isRework ? { originalOut: process.quantityOut ?? 0, pending: pendingQty ?? 0 } : undefined;
+    const prefillQuantities = isRework ? { in: pendingQty ?? 0, out: 0 } : undefined;
 
     setUpdateInfo({ process, processDef, newStatus, lastQuantity, prefillQuantities, upsPanel: job.upsPanel });
   };
   
   return (
     <>
-      <div className="relative pl-8">
+      <div className="relative pl-6 sm:pl-8">
         {/* Vertical line */}
-        <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border -translate-x-1/2" />
+        <div className="absolute left-3 sm:left-4 top-4 bottom-4 w-0.5 bg-border -translate-x-1/2" />
 
-        <div className="space-y-8">
-          {allProcesses.map((processDef) => {
+        <div className="space-y-6 sm:space-y-8">
+          {processesToRender.map((processDef) => {
             const process = jobProcesses.find((p) => p.processId === processDef.processId);
             if (!process) return null;
 
             const assignedUser = users.find((u) => u.id === process.assignedTo);
-            const canUpdate = process.assignedTo === currentUser.id || (process.status === 'Pending' && currentUser.department === processDef.processName);
+            const canUpdate =
+              currentUser.role === 'admin' ||
+              currentUser.department === processDef.processName ||
+              process.assignedTo === currentUser.id;
 
-            const pendingQty = calculatePending(process);
+            const allowRework = preMaskSequence === null ? true : processDef.sequenceNumber < preMaskSequence;
+            const pendingQty = allowRework ? calculatePending(process) : null;
+            const rejectQty = !allowRework && process.quantityIn !== null ? (process.rejectQuantity ?? null) : null;
 
 
             return (
               <div key={process.id} className="relative">
-                <div className="absolute left-4 top-5 -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
+                <div className="absolute left-3 sm:left-4 top-5 -translate-x-1/2 -translate-y-1/2 bg-background p-1 rounded-full">
                   {statusIcons[process.status]}
                 </div>
-                <Card className={`ml-8 border-l-4 ${statusColors[process.status]}`}>
-                  <CardHeader>
-                      <div className="flex justify-between items-start">
-                          <div>
+                <Card className={`ml-6 sm:ml-8 border-l-4 shadow-sm ${statusColors[process.status]}`}>
+                  <CardHeader className="space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
                             <CardTitle>{processDef.processName}</CardTitle>
                             <CardDescription>
                               Status: <span className="font-semibold">{process.status}</span>
@@ -239,15 +279,6 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
                             </CardDescription>
                           </div>
                           <div className="flex items-center gap-2">
-                              {assignedUser && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                  <Avatar className="h-8 w-8">
-                                      <AvatarImage src={assignedUser.avatarUrl} data-ai-hint="person portrait" />
-                                      <AvatarFallback>{assignedUser.name.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                  <span>{assignedUser.name}</span>
-                                  </div>
-                              )}
                               <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4"/></Button>
@@ -278,24 +309,31 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
                         </div>
                       )}
 
-                      { (process.status !== 'Pending' && (process.quantityIn !== null || process.reworkQuantityIn !== null)) && (
+                      { (process.status !== 'Pending' && (process.quantityIn !== null || process.reworkQuantityIn !== null || process.rejectQuantity !== null)) && (
                         <div className='text-sm space-y-1 text-muted-foreground'>
                             {process.quantityIn !== null && <p>Original In: <span className='font-medium text-foreground'>{process.quantityIn}</span></p>}
-                            {process.reworkQuantityIn !== null && <p>Rework In: <span className='font-medium text-foreground'>{process.reworkQuantityIn}</span></p>}
-                            {process.quantityOut !== null && <p>Original Out: <span className='font-medium text-foreground'>{process.quantityOut}</span></p>}
-                            {process.reworkQuantityOut !== null && <p>Rework Out: <span className='font-medium text-foreground'>{process.reworkQuantityOut}</span></p>}
+                            {allowRework && (
+                              <p>Rework In: <span className='font-medium text-foreground'>{process.reworkQuantityIn ?? 0}</span></p>
+                            )}
+                            {process.quantityOut !== null && (
+                              <p>
+                                Original Out:{' '}
+                                <span className='font-medium text-foreground'>
+                                  {process.quantityOut + (process.reworkQuantityOut ?? 0)}
+                                </span>
+                              </p>
+                            )}
+                            {allowRework && (
+                              <p>Rework Out: <span className='font-medium text-foreground'>{process.reworkQuantityOut ?? 0}</span></p>
+                            )}
                             {pendingQty !== null && <p>Pending: <span className={`font-medium ${pendingQty > 0 ? 'text-destructive' : 'text-foreground'}`}>{pendingQty}</span></p>}
+                            {rejectQty !== null && rejectQty > 0 && <p>Reject Quantity: <span className="font-medium text-destructive">{rejectQty}</span></p>}
                         </div>
                       )}
                     </div>
                   </CardContent>
                   
-                  <CardFooter className="flex justify-end items-center gap-4">
-                     {(pendingQty ?? 0) > 0 && (
-                        <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress')}>
-                            <RefreshCw className="mr-2 h-4 w-4" /> Rework
-                        </Button>
-                     )}
+                  <CardFooter className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
                      {canUpdate && process.status === 'Pending' && (
                         <Button onClick={() => handleStartProcess(process)}>
                           <Play className="mr-2 h-4 w-4" /> Start
@@ -306,22 +344,21 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
                           <Button variant="destructive" size="sm" onClick={() => openUpdateDialog(process, 'Rejected')}>
                             <XCircle className="mr-2 h-4 w-4" /> Issue / Reject
                           </Button>
-                          <div className="flex items-center space-x-2">
-                              <Checkbox
-                                  id={`complete-${process.id}`}
-                                  onCheckedChange={(checked) => {
-                                  if (checked) {
-                                      openUpdateDialog(process, 'Completed');
-                                  }
-                                  }}
-                                  checked={false} // Should not remain checked
-                              />
-                              <Label htmlFor={`complete-${process.id}`} className="font-semibold text-green-600">
-                                  Mark as Complete
-                              </Label>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openUpdateDialog(process, 'Completed')}
+                            className="border-green-500 text-green-600 hover:bg-green-50"
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" /> Mark as Complete
+                          </Button>
                         </>
                       )}
+                     {allowRework && (process.status === 'Completed' || process.status === 'Rejected') && (pendingQty ?? 0) > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => openUpdateDialog(process, 'In Progress')}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Rework
+                        </Button>
+                     )}
                   </CardFooter>
                 </Card>
               </div>
@@ -370,6 +407,10 @@ export function JobTimeline({ jobId, job, jobProcesses, allProcesses, users, cur
                 <div>
                   <p className="text-sm font-medium">Quantity Out</p>
                   <p>{historyProcess.quantityOut ?? 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Reject Quantity</p>
+                  <p>{historyProcess.rejectQuantity ?? 'N/A'}</p>
                 </div>
               </div>
               {historyProcess.remarks && (

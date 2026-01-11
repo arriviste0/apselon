@@ -32,7 +32,7 @@ export interface ProcessUpdateInfo {
   processDef: Process;
   newStatus: 'Completed' | 'Rejected' | 'In Progress';
   lastQuantity: number | null;
-  prefillQuantities?: { in: number; out: number } | { originalOut: number; pending: number };
+  prefillQuantities?: { in: number; out: number };
   upsPanel?: number;
 }
 
@@ -42,7 +42,7 @@ interface ProcessUpdateDialogProps {
   onSubmit: (
     process: JobProcess,
     newStatus: 'Completed' | 'Rejected' | 'In Progress',
-    quantityData: { launchedPanels?: number; quantityIn?: number; quantityOut?: number; pending?: number }
+    quantityData: { launchedPanels?: number; quantityIn?: number; quantityOut?: number }
   ) => void;
   remarks: string;
   onRemarksChange: (remarks: string) => void;
@@ -51,8 +51,6 @@ interface ProcessUpdateDialogProps {
 const formSchema = z.object({
   quantityIn: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
   quantityOut: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
-  originalOut: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
-  pending: z.coerce.number().min(0, 'Quantity cannot be negative.').optional(),
   launchedPanels: z.any().optional(), // No longer used in the form, but keep for submission data structure
 });
 
@@ -72,8 +70,6 @@ export function ProcessUpdateDialog({
     defaultValues: {
         quantityIn: 0,
         quantityOut: 0,
-        originalOut: 0,
-        pending: 0,
     }
   });
 
@@ -82,10 +78,8 @@ export function ProcessUpdateDialog({
   React.useEffect(() => {
     if (updateInfo) {
       const defaultValues: FormSchemaType = {
-        quantityIn: updateInfo.prefillQuantities && 'in' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.in : (isRework ? 0 : updateInfo.lastQuantity ?? 0),
-        quantityOut: updateInfo.prefillQuantities && 'out' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.out : (updateInfo.newStatus === 'Completed' && !isRework ? (updateInfo.lastQuantity ?? 0) : (isRework ? (updateInfo.prefillQuantities && 'in' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.in : 0) : 0)),
-        originalOut: isRework && updateInfo.prefillQuantities && 'originalOut' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.originalOut : 0,
-        pending: isRework && updateInfo.prefillQuantities && 'pending' in updateInfo.prefillQuantities ? updateInfo.prefillQuantities.pending : 0,
+        quantityIn: updateInfo.prefillQuantities ? updateInfo.prefillQuantities.in : (isRework ? 0 : updateInfo.lastQuantity ?? 0),
+        quantityOut: updateInfo.prefillQuantities ? updateInfo.prefillQuantities.out : (updateInfo.newStatus === 'Completed' && !isRework ? (updateInfo.lastQuantity ?? 0) : 0),
       };
       form.reset(defaultValues);
     }
@@ -95,11 +89,7 @@ export function ProcessUpdateDialog({
   const handleSubmit = (values: FormSchemaType) => {
     if (!updateInfo) return;
     const { process, newStatus } = updateInfo;
-    if (isRework) {
-      onSubmit(process, newStatus, { quantityOut: values.originalOut, pending: values.pending, launchedPanels: undefined });
-    } else {
-      onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
-    }
+    onSubmit(process, newStatus, { ...values, launchedPanels: undefined });
   };
 
   const processName = updateInfo?.processDef?.processName || '';
@@ -107,7 +97,7 @@ export function ProcessUpdateDialog({
 
   const processesUsingPCBs = ['Pre-Mask Q.C.', 'BBT', 'Q.C', 'PACKING'];
   const unitName = processesUsingPCBs.includes(processName) ? 'PCBs' : 'panels';
-  const displayedQuantity = updateInfo && processesUsingPCBs.includes(processName) && updateInfo.lastQuantity ? updateInfo.lastQuantity * (updateInfo.upsPanel ?? 1) : updateInfo?.lastQuantity;
+  const displayedQuantity = updateInfo ? updateInfo.lastQuantity : null;
 
   const getTitle = () => {
     if (isRework) return `Rework: ${processName}`;
@@ -115,7 +105,7 @@ export function ProcessUpdateDialog({
   }
 
   const getDescription = () => {
-    if (isRework) return `Log a rework for this process. The IN quantity is the number of pending items.`;
+    if (isRework) return `Log rework quantities for this process. Original quantities remain unchanged.`;
     return `Confirming status as `
   }
 
@@ -144,7 +134,7 @@ export function ProcessUpdateDialog({
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription>
-                    Adjust the original OUT quantity and pending quantity for rework.
+                    Enter the quantities being reworked. Original IN/OUT quantities are kept separate.
                 </AlertDescription>
               </Alert>
         )}
@@ -156,10 +146,10 @@ export function ProcessUpdateDialog({
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="originalOut"
+                    name="quantityIn"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Original OUT Quantity</FormLabel>
+                        <FormLabel>Rework IN Quantity</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>
@@ -169,10 +159,10 @@ export function ProcessUpdateDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="pending"
+                    name="quantityOut"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pending Quantity</FormLabel>
+                        <FormLabel>Rework OUT Quantity</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
                         </FormControl>

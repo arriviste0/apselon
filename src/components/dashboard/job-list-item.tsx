@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { JobWithProcesses, Process } from '@/lib/types';
 import {
   TableCell,
@@ -22,17 +23,26 @@ import { format, parseISO } from 'date-fns';
 interface JobListItemProps {
   job: JobWithProcesses;
   processes: Process[];
+  visibleProcesses?: Process[];
+  canManageJobs?: boolean;
   onEdit: (job: JobWithProcesses) => void;
   onDelete: (jobId: string) => void;
 }
 
-export function JobListItem({ job, processes, onEdit, onDelete }: JobListItemProps) {
+export function JobListItem({ job, processes, visibleProcesses, canManageJobs = true, onEdit, onDelete }: JobListItemProps) {
+  const router = useRouter();
+  const jobRouteId = job.refNo && job.refNo.trim() ? job.refNo : job.jobId;
+  const jobRouteParam = encodeURIComponent(jobRouteId);
+  const processList = visibleProcesses ?? processes;
+  const processIds = new Set(processList.map((process) => process.processId));
   const completedProcesses = job.processes.filter(
-    (p) => p.status === 'Completed'
+    (p) => processIds.has(p.processId) && p.status === 'Completed'
   ).length;
-  const progressPercentage = (completedProcesses / processes.length) * 100;
+  const progressPercentage = processList.length > 0
+    ? (completedProcesses / processList.length) * 100
+    : 0;
 
-  const currentProcess = processes.find(
+  const currentProcess = processList.find(
     (p) => job.processes.find(jp => jp.processId === p.processId && jp.status === 'In Progress')
   );
 
@@ -50,12 +60,20 @@ export function JobListItem({ job, processes, onEdit, onDelete }: JobListItemPro
 
   return (
     <TableRow>
-      <TableCell className="font-medium">
-        <Link href={`/jobs/${job.jobId}`} className="hover:underline text-primary">
+      <TableCell className="font-medium whitespace-nowrap">
+        <Link href={`/jobs/${jobRouteParam}`} className="hover:underline text-primary">
           {job.jobId.toUpperCase()}
         </Link>
       </TableCell>
-      <TableCell>{job.customerName}</TableCell>
+      <TableCell>
+        <div className="flex flex-col">
+          <span>{job.customerName}</span>
+          <div className="text-xs text-muted-foreground md:hidden">
+            <span className="mr-2">Priority: {job.priority}</span>
+            <span>Due: {format(parseISO(job.dueDate), 'MMM dd, yyyy')}</span>
+          </div>
+        </div>
+      </TableCell>
       <TableCell>
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center">
@@ -67,12 +85,12 @@ export function JobListItem({ job, processes, onEdit, onDelete }: JobListItemPro
           <Progress value={progressPercentage} className="h-2" />
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell">
         <Badge variant={getPriorityBadgeVariant(job.priority)}>
           {job.priority}
         </Badge>
       </TableCell>
-      <TableCell>{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</TableCell>
+      <TableCell className="whitespace-nowrap hidden lg:table-cell">{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</TableCell>
       <TableCell className="text-right">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -81,18 +99,22 @@ export function JobListItem({ job, processes, onEdit, onDelete }: JobListItemPro
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/jobs/${job.jobId}`}>View Details</Link>
+            <DropdownMenuItem onSelect={() => router.push(`/jobs/${jobRouteParam}`)}>
+              View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(job)}>
-              Edit Job
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="text-destructive"
-              onClick={() => onDelete(job.jobId)}
-            >
-              Delete Job
-            </DropdownMenuItem>
+            {canManageJobs && (
+              <DropdownMenuItem onClick={() => onEdit(job)}>
+                Edit Job
+              </DropdownMenuItem>
+            )}
+            {canManageJobs && (
+              <DropdownMenuItem 
+                className="text-destructive"
+                onClick={() => onDelete(jobRouteId)}
+              >
+                Delete Job
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

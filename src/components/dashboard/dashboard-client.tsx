@@ -24,6 +24,7 @@ import { JobListItem } from './job-list-item';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { deleteJobAction, restoreJobAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 interface DashboardClientProps {
   initialJobs: JobWithProcesses[];
@@ -47,9 +48,12 @@ export default function DashboardClient({
   const [jobToDelete, setJobToDelete] = React.useState<string | null>(null);
 
   const { toast } = useToast();
+  const router = useRouter();
+  const isEmployee = currentUser.role === 'employee';
 
   const handleJobCreated = (newJob: JobWithProcesses) => {
     setJobs((prevJobs) => [newJob, ...prevJobs]);
+    router.refresh();
   };
 
   const handleJobUpdated = (updatedJob: JobWithProcesses) => {
@@ -59,7 +63,9 @@ export default function DashboardClient({
   const handleConfirmDelete = async () => {
     if (!jobToDelete) return;
 
-    const job = jobs.find(j => j.jobId === jobToDelete);
+    const job = jobs.find(
+      (j) => j.jobId === jobToDelete || (j.refNo && j.refNo === jobToDelete)
+    );
     if (!job) return;
 
     // Optimistically remove the job from the UI
@@ -121,7 +127,23 @@ export default function DashboardClient({
     setCreateDialogOpen(open);
   }
 
-  const filteredJobs = jobs
+  const jobsForUser = React.useMemo(() => {
+    if (!isEmployee) return jobs;
+    const processById = new Map(processes.map((process) => [process.processId, process]));
+
+    return jobs.filter((job) =>
+      job.processes.some((jobProcess) => {
+        if (jobProcess.assignedTo === currentUser.id) return true;
+        if (jobProcess.assignedTo === null) {
+          const processDef = processById.get(jobProcess.processId);
+          return processDef?.processName === currentUser.department;
+        }
+        return false;
+      })
+    );
+  }, [isEmployee, jobs, processes, currentUser.id, currentUser.department]);
+
+  const filteredJobs = jobsForUser
     .filter((job) => {
       if (statusFilter === 'All') return true;
       return job.status === statusFilter;
@@ -132,27 +154,42 @@ export default function DashboardClient({
       job.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+  const dedupedJobs = React.useMemo(() => {
+    const seen = new Set<string>();
+    return filteredJobs.filter((job) => {
+      const key = `${job.jobId}-${job.createdAt}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [filteredJobs]);
+
   return (
     <>
-      <div className="flex flex-col gap-6">
-        <StatsCards jobs={jobs} />
+      <div className="space-y-6">
+        <StatsCards jobs={jobsForUser} />
 
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold">All Jobs</h1>
-          <CreateJobDialog
-            users={users}
-            processes={processes}
-            onJobCreated={handleJobCreated}
-            onJobUpdated={handleJobUpdated}
-            jobToEdit={jobToEdit}
-            isOpen={isCreateDialogOpen}
-            onOpenChange={handleCloseDialog}
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold">All Jobs</h1>
+            <p className="text-sm text-muted-foreground">Track progress and manage production flow.</p>
+          </div>
+          {!isEmployee && (
+            <CreateJobDialog
+              users={users}
+              processes={processes}
+              onJobCreated={handleJobCreated}
+              onJobUpdated={handleJobUpdated}
+              jobToEdit={jobToEdit}
+              isOpen={isCreateDialogOpen}
+              onOpenChange={handleCloseDialog}
+            />
+          )}
         </div>
 
-        <div>
-          <div className="flex items-center gap-4 py-4">
-            <div className="relative flex-1">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search jobs by ID, customer..."
@@ -162,7 +199,7 @@ export default function DashboardClient({
               />
             </div>
             <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as JobStatus | 'All')}>
-              <TabsList>
+              <TabsList className="w-full flex-wrap justify-start gap-1 lg:w-auto">
                 <TabsTrigger value="All">All</TabsTrigger>
                 <TabsTrigger value="In Progress">In Progress</TabsTrigger>
                 <TabsTrigger value="Overdue">Overdue</TabsTrigger>
@@ -170,29 +207,47 @@ export default function DashboardClient({
               </TabsList>
             </Tabs>
           </div>
-          <div className="rounded-lg border">
-            <Table>
+          <div className="rounded-lg border bg-card shadow-sm">
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">Job ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Progress</TableHead>
-                  <TableHead className="w-[150px]">Priority</TableHead>
-                  <TableHead className="w-[150px]">Due Date</TableHead>
+                  <TableHead className="w-[150px] hidden md:table-cell">Priority</TableHead>
+                  <TableHead className="w-[150px] hidden lg:table-cell">Due Date</TableHead>
                   <TableHead className="text-right w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobs.length > 0 ? (
-                  filteredJobs.map((job) => (
-                    <JobListItem 
-                      key={job.jobId} 
-                      job={job} 
-                      processes={processes} 
-                      onEdit={handleEdit}
-                      onDelete={setJobToDelete}
-                    />
-                  ))
+                {dedupedJobs.length > 0 ? (
+                  dedupedJobs.map((job) => {
+                    const visibleProcesses = isEmployee
+                      ? processes.filter((processDef) =>
+                          job.processes.some((jobProcess) => {
+                            if (jobProcess.processId !== processDef.processId) return false;
+                            if (jobProcess.assignedTo === currentUser.id) return true;
+                            if (jobProcess.assignedTo === null) {
+                              return processDef.processName === currentUser.department;
+                            }
+                            return false;
+                          })
+                        )
+                      : processes;
+
+                    return (
+                      <JobListItem 
+                        key={`${job.jobId}-${job.createdAt}`} 
+                        job={job} 
+                        processes={processes} 
+                        visibleProcesses={visibleProcesses}
+                        canManageJobs={!isEmployee}
+                        onEdit={handleEdit}
+                        onDelete={setJobToDelete}
+                      />
+                    );
+                  })
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
@@ -201,7 +256,8 @@ export default function DashboardClient({
                   </TableRow>
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </div>
         </div>
       </div>

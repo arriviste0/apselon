@@ -84,6 +84,7 @@ export interface JobProcess {
   quantityOut?: number | null;
   reworkQuantityIn?: number | null;
   reworkQuantityOut?: number | null;
+  rejectQuantity?: number | null;
   launchedPanels?: number | null;
 }
 

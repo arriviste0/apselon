@@ -5,12 +5,18 @@ import { addJob, addJobProcesses, getProcesses, deleteJob, updateJob, restoreJob
 import { Job, JobWithProcesses, JobProcess } from '@/lib/types';
 
 export async function createJobAction(data: Job): Promise<JobWithProcesses> {
-  const job = await addJob(data);
+  const normalizedRef = data.refNo?.trim();
+  const normalizedData = {
+    ...data,
+    refNo: normalizedRef ? normalizedRef : undefined,
+  };
+  const job = await addJob(normalizedData);
   const processes = await getProcesses();
+  const processJobId = (job.refNo && job.refNo.trim() ? job.refNo : job.jobId).toLowerCase();
 
   const jobProcesses: JobProcess[] = processes.map((p, index) => ({
-    id: `jp-${job.jobId}-${p.processId}`,
-    jobId: job.jobId,
+    id: `jp-${processJobId}-${p.processId}`,
+    jobId: processJobId,
     processId: p.processId,
     assignedTo: null,
     status: index === 0 ? 'In Progress' : 'Pending',
@@ -32,7 +38,7 @@ export async function createJobAction(data: Job): Promise<JobWithProcesses> {
 export async function updateJobAction(data: Job): Promise<Job> {
     const job = await updateJob(data);
     revalidatePath('/');
-    revalidatePath(`/jobs/${job.jobId}`);
+    revalidatePath(`/jobs/${job.refNo && job.refNo.trim() ? job.refNo : job.jobId}`);
     revalidatePath('/master');
     return job;
 }

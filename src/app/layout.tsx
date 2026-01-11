@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { MainSidebar } from '@/components/layout/main-sidebar';
 import { Header } from '@/components/layout/header';
+import { TopNav } from '@/components/layout/top-nav';
 import { Toaster } from '@/components/ui/toaster';
+import { UserProvider } from '@/components/user/user-provider';
 
 export const metadata: Metadata = {
-  title: 'SwiftTrack Production',
+  title: 'Apselon',
   description: 'A job-tracking system for manufacturing.',
 };
 
@@ -25,22 +26,29 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
       </head>
       <body className="font-body antialiased">
-        <SidebarProvider>
-          <div className="flex min-h-screen">
-            <MainSidebar />
-            <SidebarInset className="flex-1">
+        <UserProvider>
+          <SidebarProvider>
+            <div className="min-h-screen w-full flex-1">
               <Header />
-              <main className="p-4 sm:p-6 lg:p-8">{children}</main>
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
+              <TopNav />
+              <div className="min-h-[calc(100svh-8rem)]">
+                <SidebarInset className="flex-1">
+                  <main className="py-4 pl-4 pr-0 sm:py-6 sm:pl-6 sm:pr-0 lg:py-8 lg:pl-8 lg:pr-0">
+                    <div className="w-full">{children}</div>
+                  </main>
+                </SidebarInset>
+              </div>
+            </div>
+          </SidebarProvider>
+        </UserProvider>
         <Toaster />
       </body>
     </html>
   );
 }
+

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Job } from '@/lib/types';
+import { Job, JobProcess, Process } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -14,6 +14,14 @@ import {
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
+import { format, parseISO } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface MasterClientProps {
   initialJobs: Job[];
@@ -21,29 +29,81 @@ interface MasterClientProps {
 
 export default function MasterClient({ initialJobs }: MasterClientProps) {
   const [jobs, setJobs] = React.useState<Job[]>(initialJobs);
+  const [jobProcesses, setJobProcesses] = React.useState<JobProcess[]>([]);
+  const [processes, setProcesses] = React.useState<Process[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [customerFilter, setCustomerFilter] = React.useState('');
+  const [jobTypeFilter, setJobTypeFilter] = React.useState<'all' | 'single' | 'double'>('all');
 
   React.useEffect(() => {
-    // In a real app with a proper database, you might want to refetch or subscribe to updates.
-    // For this mock data setup, we can assume initialJobs is sufficient for the lifetime of the component
-    // unless we implement a client-side mutation that adds jobs, which we do in the dashboard.
-    // To keep this page in sync, we could use a global state or refetch on focus.
-    // For simplicity, we'll just work with the initial data.
+    setJobs(initialJobs);
+  }, [initialJobs]);
+
+  React.useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        const [jobsResponse, processesResponse, jobProcessesResponse] = await Promise.all([
+          fetch('/api/jobs'),
+          fetch('/api/processes'),
+          fetch('/api/job-processes'),
+        ]);
+        if (!jobsResponse.ok || !processesResponse.ok || !jobProcessesResponse.ok) {
+          throw new Error('Failed to load master data');
+        }
+        const fetchedJobs: Job[] = await jobsResponse.json();
+        const fetchedProcesses: Process[] = await processesResponse.json();
+        const fetchedJobProcesses: JobProcess[] = await jobProcessesResponse.json();
+        setJobs(fetchedJobs);
+        setProcesses(fetchedProcesses);
+        setJobProcesses(fetchedJobProcesses);
+      } catch (error) {
+        // Keep initialJobs if the API fails.
+      }
+    };
+    loadJobs();
   }, []);
 
-  const filteredJobs = jobs.filter(
-    (job) =>
-      job.jobId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.partNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredJobs = jobs.filter((job) => {
+    const searchValue = searchTerm.trim().toLowerCase();
+    const customerValue = customerFilter.trim().toLowerCase();
+    const layerType = job.layerType?.toLowerCase() ?? '';
+    const matchesSearch =
+      !searchValue ||
+      job.jobId.toLowerCase().includes(searchValue) ||
+      job.partNo.toLowerCase().includes(searchValue) ||
+      job.customerName.toLowerCase().includes(searchValue);
+    const matchesCustomer =
+      !customerValue || job.customerName.toLowerCase().includes(customerValue);
+    const matchesJobType =
+      jobTypeFilter === 'all' ||
+      (jobTypeFilter === 'double' && layerType.includes('double')) ||
+      (jobTypeFilter === 'single' && layerType.includes('single'));
+
+    return matchesSearch && matchesCustomer && matchesJobType;
+  });
+
+  const processById = React.useMemo(() => {
+    return new Map(processes.map((process) => [process.processId, process]));
+  }, [processes]);
+
+  const getCurrentProcessName = React.useCallback((job: Job) => {
+    const jobKey = (job.refNo && job.refNo.trim() ? job.refNo : job.jobId).toLowerCase();
+    const processEntry = jobProcesses.find(
+      (process) => process.jobId.toLowerCase() === jobKey && process.status === 'In Progress'
+    );
+    if (!processEntry) return '-';
+    return processById.get(processEntry.processId)?.processName ?? '-';
+  }, [jobProcesses, processById]);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Job Master List</h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">Job Master List</h1>
+        <p className="text-sm text-muted-foreground">Browse all jobs and jump to details.</p>
+      </div>
 
-      <div className="flex items-center gap-4 py-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by Job ID, Part No, or Customer Name..."
@@ -52,28 +112,65 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div className="w-full max-w-md">
+          <Input
+            placeholder="Filter by Customer Name..."
+            value={customerFilter}
+            onChange={(e) => setCustomerFilter(e.target.value)}
+          />
+        </div>
+        <div className="w-full max-w-xs">
+          <Select value={jobTypeFilter} onValueChange={(value) => setJobTypeFilter(value as typeof jobTypeFilter)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Job Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="single">Single Layer</SelectItem>
+              <SelectItem value="double">Double Layer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
+      <div className="rounded-lg border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Job No</TableHead>
+              <TableHead className="hidden sm:table-cell">Ref. No</TableHead>
               <TableHead>Part No</TableHead>
               <TableHead>Customer Name</TableHead>
+              <TableHead className="hidden md:table-cell">Issue Date</TableHead>
+              <TableHead className="hidden lg:table-cell">Delivery Date</TableHead>
+              <TableHead className="hidden md:table-cell">Current Process</TableHead>
+              <TableHead className="hidden sm:table-cell">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredJobs.length > 0 ? (
               filteredJobs.map((job) => (
-                <TableRow key={job.jobId}>
+                <TableRow key={`${job.jobId}-${job.createdAt}`}>
                   <TableCell className="font-medium">{job.jobId.toUpperCase()}</TableCell>
-                  <TableCell>{job.partNo}</TableCell>
-                  <TableCell>{job.customerName}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{job.refNo ?? '-'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{job.partNo}</span>
+                      <span className="text-xs text-muted-foreground sm:hidden">
+                        {job.customerName}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">{job.customerName}</TableCell>
+                  <TableCell className="whitespace-nowrap hidden md:table-cell">{format(parseISO(job.orderDate), 'MMM dd, yyyy')}</TableCell>
+                  <TableCell className="whitespace-nowrap hidden lg:table-cell">{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</TableCell>
+                  <TableCell className="hidden md:table-cell">{getCurrentProcessName(job)}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{job.status}</TableCell>
                   <TableCell className="text-right">
                     <Button asChild variant="outline" size="sm">
-                        <Link href={`/jobs/${job.jobId}`}>
+                        <Link href={`/jobs/${encodeURIComponent(job.refNo && job.refNo.trim() ? job.refNo : job.jobId)}`}>
                             View Job
                         </Link>
                     </Button>
@@ -82,13 +179,14 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   No jobs found.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
     </div>
   );

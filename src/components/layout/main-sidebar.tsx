@@ -11,38 +11,43 @@ import {
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard,
-  Briefcase,
   Settings,
   LogOut,
   BookMarked,
+  User,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { AppLogo } from '@/components/icons';
+import Image from 'next/image';
 import Link from 'next/link';
+import { useUser } from '@/components/user/user-provider';
 
 export function MainSidebar() {
   const pathname = usePathname();
+  const { user } = useUser();
+  const isEmployee = user?.role === 'employee';
 
   return (
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2">
-          <AppLogo className="w-8 h-8 text-primary" />
-          <span className="text-xl font-semibold">SwiftTrack</span>
+          <Image src="/apselon_logo.PNG" alt="Apselon" width={32} height={32} className="h-8 w-8 object-contain" />
+          <span className="text-xl font-semibold">Apselon</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/" passHref>
-              <SidebarMenuButton
-                isActive={pathname === '/'}
-                tooltip="All Jobs"
-              >
-                <LayoutDashboard />
-                All Jobs
-              </SidebarMenuButton>
-            </Link>
+            {!isEmployee && (
+              <Link href="/" passHref>
+                <SidebarMenuButton
+                  isActive={pathname === '/'}
+                  tooltip="All Jobs"
+                >
+                  <LayoutDashboard />
+                  All Jobs
+                </SidebarMenuButton>
+              </Link>
+            )}
           </SidebarMenuItem>
           <SidebarMenuItem>
             <Link href="/master" passHref>
@@ -55,14 +60,27 @@ export function MainSidebar() {
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
+          <SidebarMenuItem>
+            <Link href="/profile" passHref>
+              <SidebarMenuButton
+                isActive={pathname === '/profile'}
+                tooltip="Profile"
+              >
+                <User />
+                Profile
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings">
-              <Settings />
-              Settings
+            <SidebarMenuButton tooltip="Settings" asChild>
+              <Link href="/settings">
+                <Settings />
+                Settings
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
