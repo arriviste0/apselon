@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { format, parseISO } from 'date-fns';
@@ -22,18 +22,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useUser } from '@/components/user/user-provider';
 
 interface MasterClientProps {
   initialJobs: Job[];
 }
 
 export default function MasterClient({ initialJobs }: MasterClientProps) {
+  const { user } = useUser();
   const [jobs, setJobs] = React.useState<Job[]>(initialJobs);
   const [jobProcesses, setJobProcesses] = React.useState<JobProcess[]>([]);
   const [processes, setProcesses] = React.useState<Process[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [customerFilter, setCustomerFilter] = React.useState('');
   const [jobTypeFilter, setJobTypeFilter] = React.useState<'all' | 'single' | 'double'>('all');
+  const isAdmin = user?.role === 'admin';
 
   React.useEffect(() => {
     setJobs(initialJobs);
@@ -95,6 +98,89 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
     return processById.get(processEntry.processId)?.processName ?? '-';
   }, [jobProcesses, processById]);
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '';
+    return format(parseISO(value), 'dd-MMM-yy');
+  };
+
+  const buildExcelHtml = () => {
+    const title = 'Job Master List';
+    const generatedAt = format(new Date(), 'dd-MMM-yy HH:mm');
+    const rows = filteredJobs
+      .map((job, index) => {
+        const jobNo = job.jobId ? job.jobId.toUpperCase() : '';
+        const currentProcess = getCurrentProcessName(job);
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(jobNo)}</td>
+            <td>${escapeHtml(job.refNo ?? '')}</td>
+            <td>${escapeHtml(job.partNo ?? '')}</td>
+            <td>${escapeHtml(job.customerName ?? '')}</td>
+            <td>${escapeHtml(formatDate(job.orderDate))}</td>
+            <td>${escapeHtml(formatDate(job.dueDate))}</td>
+            <td>${escapeHtml(currentProcess)}</td>
+            <td>${escapeHtml(job.status ?? '')}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+            .title { font-weight: bold; font-size: 16px; text-align: center; }
+            .meta { font-size: 11px; color: #555; }
+            .header { font-weight: bold; background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td class="title" colspan="9">${title}</td></tr>
+            <tr><td class="meta" colspan="9">Generated: ${generatedAt}</td></tr>
+            <tr>
+              <td class="header">#</td>
+              <td class="header">Job No</td>
+              <td class="header">Ref. No</td>
+              <td class="header">Part No</td>
+              <td class="header">Customer Name</td>
+              <td class="header">Issue Date</td>
+              <td class="header">Delivery Date</td>
+              <td class="header">Current Process</td>
+              <td class="header">Status</td>
+            </tr>
+            ${rows || '<tr><td colspan="9">No jobs found.</td></tr>'}
+          </table>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleExportExcel = () => {
+    const html = buildExcelHtml();
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Job_Master_List_${format(new Date(), 'yyyyMMdd_HHmm')}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="space-y-1">
@@ -131,6 +217,18 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
             </SelectContent>
           </Select>
         </div>
+        {isAdmin ? (
+          <div className="w-full lg:w-auto lg:ml-auto">
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              className="w-full lg:w-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-lg border bg-card shadow-sm">

@@ -5,6 +5,7 @@ import { Job, JobProcess, Process } from '@/lib/types';
 import { useUser } from '@/components/user/user-provider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,8 @@ import {
   Bar,
   Legend,
 } from 'recharts';
+import { Download } from 'lucide-react';
+import { format } from 'date-fns';
 
 const getLeadTimeDays = (leadTime?: string) => {
   if (!leadTime) return null;
@@ -232,28 +235,163 @@ export default function ReportSummaryPage() {
     total: process.total,
   }));
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const buildExcelHtml = () => {
+    const generatedAt = format(new Date(), 'dd-MMM-yy HH:mm');
+    const statusRows = statusChartData
+      .map((entry) => {
+        const percent = statusCounts.total
+          ? Math.round((entry.value / statusCounts.total) * 100)
+          : 0;
+        return `
+          <tr>
+            <td>${escapeHtml(entry.name)}</td>
+            <td>${entry.value}</td>
+            <td>${percent}%</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const jobsByDateRows = jobsByDate
+      .map((entry) => `
+        <tr>
+          <td>${escapeHtml(entry.date)}</td>
+          <td>${entry.count}</td>
+        </tr>
+      `)
+      .join('');
+
+    const customerRows = customerReport
+      .map((entry) => `
+        <tr>
+          <td>${escapeHtml(entry.customer)}</td>
+          <td>${entry.jobs}</td>
+          <td>${entry.pcbs}</td>
+          <td>${entry.panels}</td>
+          <td>${entry.sqm.toFixed(2)}</td>
+        </tr>
+      `)
+      .join('');
+
+    const processRows = processCompletion
+      .map((entry) => {
+        const percent = entry.total ? Math.round((entry.completed / entry.total) * 100) : 0;
+        return `
+          <tr>
+            <td>${escapeHtml(entry.name)}</td>
+            <td>${entry.completed}</td>
+            <td>${entry.total}</td>
+            <td>${percent}%</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 12px; margin-bottom: 16px; }
+            th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+            .title { font-weight: bold; font-size: 16px; text-align: center; }
+            .section { font-weight: bold; background: #f5f5f5; }
+            .meta { font-size: 11px; color: #555; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td class="title" colspan="4">Report & Summary</td></tr>
+            <tr><td class="meta" colspan="4">Generated: ${generatedAt}</td></tr>
+            <tr><td class="meta" colspan="4">Range: ${escapeHtml(timeFilter)}</td></tr>
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="4">Key Metrics</td></tr>
+            <tr><td>Total Jobs</td><td>${statusCounts.total}</td><td>Avg Lead Time (days)</td><td>${averageLeadTime}</td></tr>
+            <tr><td>Total Launched PCBs</td><td>${totalPcbs}</td><td>Total Launched Panels</td><td>${totalPanels}</td></tr>
+            <tr><td>Total SQ MTR</td><td>${totalSqMtr.toFixed(2)}</td><td>Total Setups</td><td>${totalSetup}</td></tr>
+            <tr><td>Double Side Jobs</td><td>${totalDoubleSide}</td><td>Single Side Jobs</td><td>${totalSingleSide}</td></tr>
+            <tr><td>Total Rejections</td><td>${totalRejects}</td><td></td><td></td></tr>
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="3">Status Distribution</td></tr>
+            <tr><th>Status</th><th>Count</th><th>Share</th></tr>
+            ${statusRows || '<tr><td colspan="3">No status data available.</td></tr>'}
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="2">Jobs Over Time</td></tr>
+            <tr><th>Date</th><th>Jobs</th></tr>
+            ${jobsByDateRows || '<tr><td colspan="2">No job history available.</td></tr>'}
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="5">Customer-wise Report</td></tr>
+            <tr><th>Customer</th><th>Jobs</th><th>PCBs</th><th>Panels</th><th>SQ MTR</th></tr>
+            ${customerRows || '<tr><td colspan="5">No customer data available.</td></tr>'}
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="4">Process Completion</td></tr>
+            <tr><th>Process</th><th>Completed</th><th>Total</th><th>Completion %</th></tr>
+            ${processRows || '<tr><td colspan="4">No process data available.</td></tr>'}
+          </table>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleExportExcel = () => {
+    const html = buildExcelHtml();
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Report_Summary_${format(new Date(), 'yyyyMMdd_HHmm')}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="shadow-sm">
         <CardHeader className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Report & Summary</CardTitle>
-            <div className="w-full sm:w-52">
-              <Select
-                value={timeFilter}
-                onValueChange={(value) => setTimeFilter(value as typeof timeFilter)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="day">Last 24 Hours</SelectItem>
-                  <SelectItem value="week">Last 7 Days</SelectItem>
-                  <SelectItem value="month">Last 30 Days</SelectItem>
-                  <SelectItem value="year">Last 12 Months</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <div className="w-full sm:w-52">
+                <Select
+                  value={timeFilter}
+                  onValueChange={(value) => setTimeFilter(value as typeof timeFilter)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="day">Last 24 Hours</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="year">Last 12 Months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleExportExcel} variant="outline" className="w-full sm:w-auto">
+                <Download className="mr-2 h-4 w-4" />
+                Export Excel
+              </Button>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
