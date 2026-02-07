@@ -83,7 +83,9 @@ export default function JobDetailsClient({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <CardTitle className="text-2xl">Job {job.jobId.toUpperCase()}</CardTitle>
-              <CardDescription>{job.customerName} - {job.partNo}</CardDescription>
+              {displayUser.role === 'admin' ? (
+                <CardDescription>{job.customerName} - {job.partNo}</CardDescription>
+              ) : null}
             </div>
             <Badge variant={job.status === 'Overdue' ? 'destructive' : 'secondary'} className="text-sm">
               {job.status}
@@ -128,7 +130,7 @@ export default function JobDetailsClient({
           />
         </TabsContent>
         <TabsContent value="traveller-card">
-          <TravellerCardInfo job={job} />
+          <TravellerCardInfo job={job} isAdmin={displayUser.role === 'admin'} />
         </TabsContent>
       </Tabs>
     </div>

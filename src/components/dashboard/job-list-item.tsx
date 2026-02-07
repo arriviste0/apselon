@@ -25,11 +25,20 @@ interface JobListItemProps {
   processes: Process[];
   visibleProcesses?: Process[];
   canManageJobs?: boolean;
+  showCustomer?: boolean;
   onEdit: (job: JobWithProcesses) => void;
   onDelete: (jobId: string) => void;
 }
 
-export function JobListItem({ job, processes, visibleProcesses, canManageJobs = true, onEdit, onDelete }: JobListItemProps) {
+export function JobListItem({
+  job,
+  processes,
+  visibleProcesses,
+  canManageJobs = true,
+  showCustomer = true,
+  onEdit,
+  onDelete,
+}: JobListItemProps) {
   const router = useRouter();
   const jobRouteId = job.refNo && job.refNo.trim() ? job.refNo : job.jobId;
   const jobRouteParam = encodeURIComponent(jobRouteId);
@@ -65,15 +74,17 @@ export function JobListItem({ job, processes, visibleProcesses, canManageJobs = 
           {job.jobId.toUpperCase()}
         </Link>
       </TableCell>
-      <TableCell>
-        <div className="flex flex-col">
-          <span>{job.customerName}</span>
-          <div className="text-xs text-muted-foreground md:hidden">
-            <span className="mr-2">Priority: {job.priority}</span>
-            <span>Due: {format(parseISO(job.dueDate), 'MMM dd, yyyy')}</span>
+      {showCustomer ? (
+        <TableCell>
+          <div className="flex flex-col">
+            <span>{job.customerName}</span>
+            <div className="text-xs text-muted-foreground md:hidden">
+              <span className="mr-2">Priority: {job.priority}</span>
+              <span>Due: {format(parseISO(job.dueDate), 'MMM dd, yyyy')}</span>
+            </div>
           </div>
-        </div>
-      </TableCell>
+        </TableCell>
+      ) : null}
       <TableCell>
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center">

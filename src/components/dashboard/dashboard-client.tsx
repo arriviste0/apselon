@@ -25,6 +25,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { deleteJobAction, restoreJobAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { format, parseISO } from 'date-fns';
 
 interface DashboardClientProps {
   initialJobs: JobWithProcesses[];
@@ -143,16 +145,32 @@ export default function DashboardClient({
     );
   }, [isEmployee, jobs, processes, currentUser.id, currentUser.department]);
 
+  const processNameById = React.useMemo(() => {
+    return new Map(processes.map((process) => [process.processId, process.processName]));
+  }, [processes]);
+
+  const getCurrentProcessName = React.useCallback(
+    (job: JobWithProcesses) => {
+      const current = job.processes.find((process) => process.status === 'In Progress');
+      if (!current) return '-';
+      return processNameById.get(current.processId) ?? '-';
+    },
+    [processNameById]
+  );
+
   const filteredJobs = jobsForUser
     .filter((job) => {
       if (statusFilter === 'All') return true;
       return job.status === statusFilter;
     })
-    .filter((job) =>
-      job.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.jobId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter((job) => {
+      const query = searchTerm.toLowerCase();
+      if (!query) return true;
+      if (job.jobId.toLowerCase().includes(query)) return true;
+      if (job.description?.toLowerCase().includes(query)) return true;
+      if (!isEmployee && job.customerName.toLowerCase().includes(query)) return true;
+      return false;
+    });
 
   const dedupedJobs = React.useMemo(() => {
     const seen = new Set<string>();
@@ -163,6 +181,8 @@ export default function DashboardClient({
       return true;
     });
   }, [filteredJobs]);
+
+  const tableColCount = isEmployee ? 5 : 6;
 
   return (
     <>
@@ -192,7 +212,7 @@ export default function DashboardClient({
             <div className="relative w-full lg:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search jobs by ID, customer..."
+                placeholder={isEmployee ? "Search jobs by ID..." : "Search jobs by ID, customer..."}
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -213,7 +233,7 @@ export default function DashboardClient({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">Job ID</TableHead>
-                  <TableHead>Customer</TableHead>
+                  {!isEmployee ? <TableHead>Customer</TableHead> : null}
                   <TableHead>Progress</TableHead>
                   <TableHead className="w-[150px] hidden md:table-cell">Priority</TableHead>
                   <TableHead className="w-[150px] hidden lg:table-cell">Due Date</TableHead>
@@ -237,12 +257,13 @@ export default function DashboardClient({
                       : processes;
 
                     return (
-                      <JobListItem 
+                        <JobListItem 
                         key={`${job.jobId}-${job.createdAt}`} 
                         job={job} 
                         processes={processes} 
                         visibleProcesses={visibleProcesses}
                         canManageJobs={!isEmployee}
+                        showCustomer={!isEmployee}
                         onEdit={handleEdit}
                         onDelete={setJobToDelete}
                       />
@@ -250,7 +271,7 @@ export default function DashboardClient({
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={tableColCount} className="h-24 text-center">
                       No jobs found.
                     </TableCell>
                   </TableRow>
@@ -260,6 +281,84 @@ export default function DashboardClient({
             </div>
           </div>
         </div>
+
+        {!isEmployee && (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold">Production Master</h2>
+                <p className="text-sm text-muted-foreground">
+                  Master list pulled directly from the job cards.
+                </p>
+              </div>
+              <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/master">View Full Master</Link>
+              </Button>
+            </div>
+            <div className="rounded-lg border bg-card shadow-sm">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job No</TableHead>
+                      <TableHead className="hidden sm:table-cell">Ref. No</TableHead>
+                      <TableHead>Part No</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="hidden md:table-cell">Issue Date</TableHead>
+                      <TableHead className="hidden lg:table-cell">Delivery Date</TableHead>
+                      <TableHead className="hidden md:table-cell">Current Process</TableHead>
+                      <TableHead className="hidden sm:table-cell">Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.length > 0 ? (
+                      jobs.map((job) => {
+                        const jobRouteId = job.refNo && job.refNo.trim() ? job.refNo : job.jobId;
+                        return (
+                          <TableRow key={`master-${job.jobId}-${job.createdAt}`}>
+                            <TableCell className="font-medium">{job.jobId.toUpperCase()}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{job.refNo ?? '-'}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span>{job.partNo}</span>
+                                <span className="text-xs text-muted-foreground sm:hidden">
+                                  {job.customerName}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">{job.customerName}</TableCell>
+                            <TableCell className="whitespace-nowrap hidden md:table-cell">
+                              {format(parseISO(job.orderDate), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap hidden lg:table-cell">
+                              {format(parseISO(job.dueDate), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">{getCurrentProcessName(job)}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{job.status}</TableCell>
+                            <TableCell className="text-right">
+                              <Button asChild variant="outline" size="sm">
+                                <Link href={`/jobs/${encodeURIComponent(jobRouteId)}`}>
+                                  View Job
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={9} className="h-24 text-center">
+                          No jobs found.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <AlertDialog open={!!jobToDelete} onOpenChange={() => setJobToDelete(null)}>
         <AlertDialogContent>

@@ -8,6 +8,7 @@ import { Download, Printer } from 'lucide-react';
 
 interface TravellerCardInfoProps {
   job: Job;
+  isAdmin?: boolean;
 }
 
 const InfoItem = ({ label, value, className }: { label: string, value: React.ReactNode, className?: string }) => (
@@ -17,7 +18,7 @@ const InfoItem = ({ label, value, className }: { label: string, value: React.Rea
     </div>
 );
 
-export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
+export function TravellerCardInfo({ job, isAdmin = false }: TravellerCardInfoProps) {
   const handlePrint = () => {
     window.print();
   };
@@ -64,6 +65,34 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
 
   const buildExcelHtml = () => {
     const totalSqm = (job.launchedPcbSqm ?? 0).toFixed(2);
+    const customerRow = isAdmin
+      ? `
+            <tr>
+              <td class="label">Customer</td><td colspan="4">${job.customerName ?? ''}</td>
+              <td class="label">LEAD TIME</td><td colspan="2">${job.leadTime ?? ''}</td>
+              <td colspan="4"></td>
+            </tr>
+        `
+      : `
+            <tr>
+              <td class="label">LEAD TIME</td><td colspan="2">${job.leadTime ?? ''}</td>
+              <td colspan="9"></td>
+            </tr>
+        `;
+    const partNoRow = isAdmin
+      ? `
+            <tr>
+              <td class="label">Part No</td><td colspan="4">${job.partNo ?? ''}</td>
+              <td class="label">DEL DATE</td><td colspan="2">${getDateValue(job.dueDate)}</td>
+              <td colspan="4"></td>
+            </tr>
+        `
+      : `
+            <tr>
+              <td class="label">DEL DATE</td><td colspan="2">${getDateValue(job.dueDate)}</td>
+              <td colspan="9"></td>
+            </tr>
+        `;
     const html = `
       <html>
         <head>
@@ -89,16 +118,8 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
               <td class="label">REF.NO</td><td colspan="2">${job.refNo ?? ''}</td>
               <td colspan="4"></td>
             </tr>
-            <tr>
-              <td class="label">Customer</td><td colspan="4">${job.customerName ?? ''}</td>
-              <td class="label">LEAD TIME</td><td colspan="2">${job.leadTime ?? ''}</td>
-              <td colspan="4"></td>
-            </tr>
-            <tr>
-              <td class="label">Part No</td><td colspan="4">${job.partNo ?? ''}</td>
-              <td class="label">DEL DATE</td><td colspan="2">${getDateValue(job.dueDate)}</td>
-              <td colspan="4"></td>
-            </tr>
+            ${customerRow}
+            ${partNoRow}
             <tr>
               <td class="label">P.O.NO.</td><td colspan="2">${job.poNo ?? ''}</td>
               <td class="label">PO DATE</td><td colspan="2">${getDateValue(job.orderDate)}</td>
@@ -237,8 +258,12 @@ export function TravellerCardInfo({ job }: TravellerCardInfoProps) {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-4">
             <InfoItem label="Job No." value={formattedJobId} />
             <InfoItem label="Ref. No." value={job.refNo} />
-            <InfoItem label="Customer" value={job.customerName} className="col-span-2"/>
-            <InfoItem label="Part No." value={job.partNo} className="col-span-2"/>
+            {isAdmin ? (
+              <InfoItem label="Customer" value={job.customerName} className="col-span-2" />
+            ) : null}
+            {isAdmin ? (
+              <InfoItem label="Part No." value={job.partNo} className="col-span-2" />
+            ) : null}
             <InfoItem label="Lead Time" value={job.leadTime} />
             <InfoItem label="Delivery Date" value={format(deliveryDate, 'dd-MMM-yy')} />
             <InfoItem label="P.O. No." value={job.poNo} />

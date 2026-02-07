@@ -15,7 +15,10 @@ export default async function DashboardPage() {
   }
 
   const jobsWithProcesses = jobs.map(job => {
-    const relatedProcesses = jobProcesses.filter(jp => jp.jobId === job.jobId);
+    const jobKey = (job.refNo && job.refNo.trim() ? job.refNo : job.jobId).toLowerCase();
+    const relatedProcesses = jobProcesses.filter(
+      jp => jp.jobId.toLowerCase() === jobKey
+    );
     return { ...job, processes: relatedProcesses };
   });
 

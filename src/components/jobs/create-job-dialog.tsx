@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { createJobAction } from '@/app/actions';
 import { Switch } from '../ui/switch';
 import { ScrollArea } from '../ui/scroll-area';
+import { Label } from '@/components/ui/label';
 
 
 const formSchema = z.object({
@@ -94,6 +95,16 @@ const formSchema = z.object({
   preparedBy: z.string().optional(),
 });
 
+interface CustomerMasterEntry {
+  id: string;
+  customerName: string;
+  contactDetails: string;
+  gstDetails: string;
+  address: string;
+  notes: string;
+  createdAt: string;
+}
+
 interface CreateJobDialogProps {
   users: User[];
   processes: Process[];
@@ -115,8 +126,20 @@ export function CreateJobDialog({
 }: CreateJobDialogProps) {
   const { toast } = useToast();
   const [allJobs, setAllJobs] = React.useState<Job[]>([]);
+  const [customerMaster, setCustomerMaster] = React.useState<CustomerMasterEntry[]>([]);
+  const [customerDialogOpen, setCustomerDialogOpen] = React.useState(false);
+  const [customerDraft, setCustomerDraft] = React.useState<Omit<CustomerMasterEntry, 'id' | 'createdAt'>>({
+    customerName: '',
+    contactDetails: '',
+    gstDetails: '',
+    address: '',
+    notes: '',
+  });
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>('');
+  const [editingCustomerId, setEditingCustomerId] = React.useState<string | null>(null);
   
   const isEditing = !!jobToEdit;
+  const customerStorageKey = 'apselon.customerMaster';
 
   React.useEffect(() => {
     async function fetchJobs() {
@@ -135,6 +158,25 @@ export function CreateJobDialog({
         fetchJobs();
     }
   }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') return;
+    try {
+      const stored = window.localStorage.getItem(customerStorageKey);
+      if (!stored) {
+        setCustomerMaster([]);
+        return;
+      }
+      const parsed = JSON.parse(stored) as CustomerMasterEntry[];
+      if (Array.isArray(parsed)) {
+        setCustomerMaster(parsed);
+      } else {
+        setCustomerMaster([]);
+      }
+    } catch (error) {
+      setCustomerMaster([]);
+    }
+  }, [isOpen, customerStorageKey]);
 
   const defaultFormValues = {
         isRepeat: false,
@@ -226,6 +268,18 @@ export function CreateJobDialog({
   const upsArrayWidthValue = form.watch('upsArrayWidth');
   const upsArrayHeightValue = form.watch('upsArrayHeight');
   const mTraceValue = form.watch('mTraceSetup');
+  const customerNameValue = form.watch('customerName');
+
+  React.useEffect(() => {
+    if (!customerNameValue) {
+      setSelectedCustomerId('');
+      return;
+    }
+    const match = customerMaster.find(
+      (customer) => customer.customerName.toLowerCase() === customerNameValue.toLowerCase()
+    );
+    setSelectedCustomerId(match?.id ?? '');
+  }, [customerMaster, customerNameValue]);
 
   React.useEffect(() => {
     if (!orderDateValue || !leadTimeValue) return;
@@ -376,6 +430,99 @@ export function CreateJobDialog({
         });
     }
   }
+
+  const handleSaveCustomerMaster = () => {
+    const trimmedName = customerDraft.customerName.trim();
+    if (!trimmedName) {
+      toast({
+        title: 'Customer name required',
+        description: 'Please enter a customer name to save.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const nextEntry: CustomerMasterEntry = {
+      id: editingCustomerId ?? `customer-${Date.now()}`,
+      customerName: trimmedName,
+      contactDetails: customerDraft.contactDetails.trim(),
+      gstDetails: customerDraft.gstDetails.trim(),
+      address: customerDraft.address.trim(),
+      notes: customerDraft.notes.trim(),
+      createdAt: editingCustomerId
+        ? customerMaster.find((customer) => customer.id === editingCustomerId)?.createdAt ??
+          new Date().toISOString()
+        : new Date().toISOString(),
+    };
+
+    const next = [
+      nextEntry,
+      ...customerMaster.filter(
+        (customer) =>
+          customer.id !== nextEntry.id &&
+          customer.customerName.toLowerCase() !== trimmedName.toLowerCase()
+      ),
+    ];
+
+    setCustomerMaster(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(customerStorageKey, JSON.stringify(next));
+    }
+
+    form.setValue('customerName', nextEntry.customerName, { shouldValidate: true });
+    setSelectedCustomerId(nextEntry.id);
+    setCustomerDialogOpen(false);
+    setCustomerDraft({
+      customerName: '',
+      contactDetails: '',
+      gstDetails: '',
+      address: '',
+      notes: '',
+    });
+    setEditingCustomerId(null);
+    toast({
+      title: editingCustomerId ? 'Customer updated' : 'Customer saved',
+      description: editingCustomerId
+        ? 'Customer master details have been updated.'
+        : 'Customer master details have been added.',
+    });
+  };
+
+  const handleEditCustomer = (customer: CustomerMasterEntry) => {
+    setEditingCustomerId(customer.id);
+    setCustomerDraft({
+      customerName: customer.customerName,
+      contactDetails: customer.contactDetails,
+      gstDetails: customer.gstDetails,
+      address: customer.address,
+      notes: customer.notes,
+    });
+  };
+
+  const handleDeleteCustomer = (customerId: string) => {
+    const next = customerMaster.filter((customer) => customer.id !== customerId);
+    setCustomerMaster(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(customerStorageKey, JSON.stringify(next));
+    }
+    if (selectedCustomerId === customerId) {
+      setSelectedCustomerId('');
+    }
+    if (editingCustomerId === customerId) {
+      setEditingCustomerId(null);
+      setCustomerDraft({
+        customerName: '',
+        contactDetails: '',
+        gstDetails: '',
+        address: '',
+        notes: '',
+      });
+    }
+    toast({
+      title: 'Customer deleted',
+      description: 'Customer master entry has been removed.',
+    });
+  };
   
 
   const dialogTitle = isEditing ? `Edit Job ${jobToEdit?.jobId.toUpperCase()}` : 'Create New Job (Traveller Card)';
@@ -404,6 +551,131 @@ export function CreateJobDialog({
             {dialogDescription}
           </DialogDescription>
         </DialogHeader>
+        <Dialog open={customerDialogOpen} onOpenChange={(open) => {
+          setCustomerDialogOpen(open);
+          if (open) {
+            setEditingCustomerId(null);
+            setCustomerDraft({
+              customerName: '',
+              contactDetails: '',
+              gstDetails: '',
+              address: '',
+              notes: '',
+            });
+          }
+        }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Customer Master</DialogTitle>
+              <DialogDescription>
+                Add or update customer details while creating a new job.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4">
+              {customerMaster.length > 0 ? (
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <p className="text-sm font-medium">Saved Customers</p>
+                  <div className="mt-2 space-y-2">
+                    {customerMaster.map((customer) => (
+                      <div
+                        key={customer.id}
+                        className="flex flex-col gap-2 rounded-md border bg-background p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold">{customer.customerName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {customer.contactDetails || customer.gstDetails || customer.address || 'No extra details'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditCustomer(customer)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteCustomer(customer.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="grid gap-2">
+                <Label htmlFor="customerNameMaster">Customer Name</Label>
+                <Input
+                  id="customerNameMaster"
+                  value={customerDraft.customerName}
+                  onChange={(event) =>
+                    setCustomerDraft((prev) => ({ ...prev, customerName: event.target.value }))
+                  }
+                  placeholder="ALFA"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="contactDetailsMaster">Contact Details</Label>
+                <Input
+                  id="contactDetailsMaster"
+                  value={customerDraft.contactDetails}
+                  onChange={(event) =>
+                    setCustomerDraft((prev) => ({ ...prev, contactDetails: event.target.value }))
+                  }
+                  placeholder="Person, phone, email"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="gstDetailsMaster">GST Details</Label>
+                <Input
+                  id="gstDetailsMaster"
+                  value={customerDraft.gstDetails}
+                  onChange={(event) =>
+                    setCustomerDraft((prev) => ({ ...prev, gstDetails: event.target.value }))
+                  }
+                  placeholder="GSTIN / Tax details"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="addressMaster">Address</Label>
+                <Textarea
+                  id="addressMaster"
+                  value={customerDraft.address}
+                  onChange={(event) =>
+                    setCustomerDraft((prev) => ({ ...prev, address: event.target.value }))
+                  }
+                  placeholder="Street, city, state, PIN"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notesMaster">Any Other Important Information</Label>
+                <Textarea
+                  id="notesMaster"
+                  value={customerDraft.notes}
+                  onChange={(event) =>
+                    setCustomerDraft((prev) => ({ ...prev, notes: event.target.value }))
+                  }
+                  placeholder="Special terms, delivery notes, etc."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCustomerDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSaveCustomerMaster}>
+                {editingCustomerId ? 'Update Customer' : 'Save Customer'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <ScrollArea className="h-[70vh] pr-6">
@@ -483,9 +755,58 @@ export function CreateJobDialog({
                  <FormField control={form.control} name="refNo" render={({ field }) => (
                     <FormItem><FormLabel>Ref. No</FormLabel><FormControl><Input placeholder="6" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="customerName" render={({ field }) => (
-                    <FormItem><FormLabel>Customer</FormLabel><FormControl><Input placeholder="A03 ARVI(VISHAL BHAI)" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="customerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Customer</FormLabel>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCustomerDialogOpen(true)}
+                        >
+                          Customer Master
+                        </Button>
+                      </div>
+                      <FormControl>
+                        <Input placeholder="A03 ARVI(VISHAL BHAI)" {...field} />
+                      </FormControl>
+                      {customerMaster.length > 0 ? (
+                        <div className="pt-2">
+                          <Select
+                            value={selectedCustomerId}
+                            onValueChange={(value) => {
+                              const selected = customerMaster.find((customer) => customer.id === value);
+                              setSelectedCustomerId(value);
+                              if (selected) {
+                                form.setValue('customerName', selected.customerName, { shouldValidate: true });
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select from Customer Master" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {customerMaster.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id}>
+                                  {customer.customerName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <p className="pt-2 text-xs text-muted-foreground">
+                          No customer master entries yet. Add one to reuse details.
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField control={form.control} name="leadTime" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Lead Time</FormLabel>

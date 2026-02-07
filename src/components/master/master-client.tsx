@@ -73,8 +73,9 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
     const matchesSearch =
       !searchValue ||
       job.jobId.toLowerCase().includes(searchValue) ||
-      job.partNo.toLowerCase().includes(searchValue) ||
-      job.customerName.toLowerCase().includes(searchValue);
+      job.refNo?.toLowerCase().includes(searchValue) ||
+      (isAdmin && job.partNo.toLowerCase().includes(searchValue)) ||
+      (isAdmin && job.customerName.toLowerCase().includes(searchValue));
     const matchesCustomer =
       !customerValue || job.customerName.toLowerCase().includes(customerValue);
     const matchesJobType =
@@ -184,7 +185,7 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
   return (
     <div className="flex flex-col gap-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Job Master List</h1>
+        <h1 className="text-2xl font-semibold">Production Master List</h1>
         <p className="text-sm text-muted-foreground">Browse all jobs and jump to details.</p>
       </div>
 
@@ -192,19 +193,21 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by Job ID, Part No, or Customer Name..."
+            placeholder={isAdmin ? "Search by Job ID, Part No, or Customer Name..." : "Search by Job ID or Ref. No..."}
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-full max-w-md">
-          <Input
-            placeholder="Filter by Customer Name..."
-            value={customerFilter}
-            onChange={(e) => setCustomerFilter(e.target.value)}
-          />
-        </div>
+        {isAdmin ? (
+          <div className="w-full max-w-md">
+            <Input
+              placeholder="Filter by Customer Name..."
+              value={customerFilter}
+              onChange={(e) => setCustomerFilter(e.target.value)}
+            />
+          </div>
+        ) : null}
         <div className="w-full max-w-xs">
           <Select value={jobTypeFilter} onValueChange={(value) => setJobTypeFilter(value as typeof jobTypeFilter)}>
             <SelectTrigger>
@@ -238,8 +241,8 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
             <TableRow>
               <TableHead>Job No</TableHead>
               <TableHead className="hidden sm:table-cell">Ref. No</TableHead>
-              <TableHead>Part No</TableHead>
-              <TableHead>Customer Name</TableHead>
+              {isAdmin ? <TableHead>Part No</TableHead> : null}
+              {isAdmin ? <TableHead>Customer Name</TableHead> : null}
               <TableHead className="hidden md:table-cell">Issue Date</TableHead>
               <TableHead className="hidden lg:table-cell">Delivery Date</TableHead>
               <TableHead className="hidden md:table-cell">Current Process</TableHead>
@@ -253,15 +256,19 @@ export default function MasterClient({ initialJobs }: MasterClientProps) {
                 <TableRow key={`${job.jobId}-${job.createdAt}`}>
                   <TableCell className="font-medium">{job.jobId.toUpperCase()}</TableCell>
                   <TableCell className="hidden sm:table-cell">{job.refNo ?? '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{job.partNo}</span>
-                      <span className="text-xs text-muted-foreground sm:hidden">
-                        {job.customerName}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{job.customerName}</TableCell>
+                  {isAdmin ? (
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span>{job.partNo}</span>
+                        <span className="text-xs text-muted-foreground sm:hidden">
+                          {job.customerName}
+                        </span>
+                      </div>
+                    </TableCell>
+                  ) : null}
+                  {isAdmin ? (
+                    <TableCell className="hidden sm:table-cell">{job.customerName}</TableCell>
+                  ) : null}
                   <TableCell className="whitespace-nowrap hidden md:table-cell">{format(parseISO(job.orderDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell className="whitespace-nowrap hidden lg:table-cell">{format(parseISO(job.dueDate), 'MMM dd, yyyy')}</TableCell>
                   <TableCell className="hidden md:table-cell">{getCurrentProcessName(job)}</TableCell>
