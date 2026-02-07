@@ -137,6 +137,8 @@ export function CreateJobDialog({
   });
   const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>('');
   const [editingCustomerId, setEditingCustomerId] = React.useState<string | null>(null);
+  const [customerMasterMode, setCustomerMasterMode] = React.useState<'new' | 'existing'>('new');
+  const [customerMasterSelection, setCustomerMasterSelection] = React.useState<string>('');
   
   const isEditing = !!jobToEdit;
   const customerStorageKey = 'apselon.customerMaster';
@@ -562,6 +564,8 @@ export function CreateJobDialog({
               address: '',
               notes: '',
             });
+            setCustomerMasterSelection('');
+            setCustomerMasterMode(customerMaster.length > 0 ? 'existing' : 'new');
           }
         }}>
           <DialogContent className="sm:max-w-lg">
@@ -572,107 +576,248 @@ export function CreateJobDialog({
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4">
-              {customerMaster.length > 0 ? (
-                <div className="rounded-lg border bg-muted/40 p-3">
-                  <p className="text-sm font-medium">Saved Customers</p>
-                  <div className="mt-2 space-y-2">
-                    {customerMaster.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="flex flex-col gap-2 rounded-md border bg-background p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold">{customer.customerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {customer.contactDetails || customer.gstDetails || customer.address || 'No extra details'}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditCustomer(customer)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteCustomer(customer.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+              <div className="grid gap-2">
+                <Label>Is this a new or existing customer?</Label>
+                <Select
+                  value={customerMasterMode}
+                  onValueChange={(value) => {
+                    const nextMode = value as 'new' | 'existing';
+                    setCustomerMasterMode(nextMode);
+                    setEditingCustomerId(null);
+                    setCustomerMasterSelection('');
+                    setCustomerDraft({
+                      customerName: '',
+                      contactDetails: '',
+                      gstDetails: '',
+                      address: '',
+                      notes: '',
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">New Customer</SelectItem>
+                    <SelectItem value="existing" disabled={customerMaster.length === 0}>
+                      Existing Customer
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {customerMaster.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No saved customers yet. Add a new customer to get started.
+                  </p>
+                )}
+              </div>
+
+              {customerMasterMode === 'existing' && customerMaster.length > 0 ? (
+                <div className="grid gap-3 rounded-lg border bg-muted/40 p-3">
+                  <div className="grid gap-2">
+                    <Label>Select Existing Customer</Label>
+                    <Select
+                      value={customerMasterSelection}
+                      onValueChange={(value) => {
+                        setCustomerMasterSelection(value);
+                        setEditingCustomerId(null);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customerMaster.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.customerName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                  {customerMasterSelection ? (
+                    <>
+                      {editingCustomerId === customerMasterSelection ? (
+                        <>
+                          <div className="grid gap-2">
+                            <Label htmlFor="customerNameMaster">Customer Name</Label>
+                            <Input
+                              id="customerNameMaster"
+                              value={customerDraft.customerName}
+                              onChange={(event) =>
+                                setCustomerDraft((prev) => ({ ...prev, customerName: event.target.value }))
+                              }
+                              placeholder="ALFA"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="contactDetailsMaster">Contact Details</Label>
+                            <Input
+                              id="contactDetailsMaster"
+                              value={customerDraft.contactDetails}
+                              onChange={(event) =>
+                                setCustomerDraft((prev) => ({ ...prev, contactDetails: event.target.value }))
+                              }
+                              placeholder="Person, phone, email"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="gstDetailsMaster">GST Details</Label>
+                            <Input
+                              id="gstDetailsMaster"
+                              value={customerDraft.gstDetails}
+                              onChange={(event) =>
+                                setCustomerDraft((prev) => ({ ...prev, gstDetails: event.target.value }))
+                              }
+                              placeholder="GSTIN / Tax details"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="addressMaster">Address</Label>
+                            <Textarea
+                              id="addressMaster"
+                              value={customerDraft.address}
+                              onChange={(event) =>
+                                setCustomerDraft((prev) => ({ ...prev, address: event.target.value }))
+                              }
+                              placeholder="Street, city, state, PIN"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="notesMaster">Any Other Important Information</Label>
+                            <Textarea
+                              id="notesMaster"
+                              value={customerDraft.notes}
+                              onChange={(event) =>
+                                setCustomerDraft((prev) => ({ ...prev, notes: event.target.value }))
+                              }
+                              placeholder="Special terms, delivery notes, etc."
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-md border bg-background p-3">
+                          {customerMaster
+                            .filter((customer) => customer.id === customerMasterSelection)
+                            .map((customer) => (
+                              <div key={customer.id} className="space-y-1">
+                                <p className="text-sm font-semibold">{customer.customerName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {customer.contactDetails || 'No contact details'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {customer.gstDetails || 'No GST details'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {customer.address || 'No address'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {customer.notes || 'No additional notes'}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Select a customer to view or edit details.</p>
+                  )}
                 </div>
               ) : null}
-              <div className="grid gap-2">
-                <Label htmlFor="customerNameMaster">Customer Name</Label>
-                <Input
-                  id="customerNameMaster"
-                  value={customerDraft.customerName}
-                  onChange={(event) =>
-                    setCustomerDraft((prev) => ({ ...prev, customerName: event.target.value }))
-                  }
-                  placeholder="ALFA"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="contactDetailsMaster">Contact Details</Label>
-                <Input
-                  id="contactDetailsMaster"
-                  value={customerDraft.contactDetails}
-                  onChange={(event) =>
-                    setCustomerDraft((prev) => ({ ...prev, contactDetails: event.target.value }))
-                  }
-                  placeholder="Person, phone, email"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="gstDetailsMaster">GST Details</Label>
-                <Input
-                  id="gstDetailsMaster"
-                  value={customerDraft.gstDetails}
-                  onChange={(event) =>
-                    setCustomerDraft((prev) => ({ ...prev, gstDetails: event.target.value }))
-                  }
-                  placeholder="GSTIN / Tax details"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="addressMaster">Address</Label>
-                <Textarea
-                  id="addressMaster"
-                  value={customerDraft.address}
-                  onChange={(event) =>
-                    setCustomerDraft((prev) => ({ ...prev, address: event.target.value }))
-                  }
-                  placeholder="Street, city, state, PIN"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="notesMaster">Any Other Important Information</Label>
-                <Textarea
-                  id="notesMaster"
-                  value={customerDraft.notes}
-                  onChange={(event) =>
-                    setCustomerDraft((prev) => ({ ...prev, notes: event.target.value }))
-                  }
-                  placeholder="Special terms, delivery notes, etc."
-                />
-              </div>
+
+              {customerMasterMode === 'new' ? (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="customerNameMaster">Customer Name</Label>
+                    <Input
+                      id="customerNameMaster"
+                      value={customerDraft.customerName}
+                      onChange={(event) =>
+                        setCustomerDraft((prev) => ({ ...prev, customerName: event.target.value }))
+                      }
+                      placeholder="ALFA"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="contactDetailsMaster">Contact Details</Label>
+                    <Input
+                      id="contactDetailsMaster"
+                      value={customerDraft.contactDetails}
+                      onChange={(event) =>
+                        setCustomerDraft((prev) => ({ ...prev, contactDetails: event.target.value }))
+                      }
+                      placeholder="Person, phone, email"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="gstDetailsMaster">GST Details</Label>
+                    <Input
+                      id="gstDetailsMaster"
+                      value={customerDraft.gstDetails}
+                      onChange={(event) =>
+                        setCustomerDraft((prev) => ({ ...prev, gstDetails: event.target.value }))
+                      }
+                      placeholder="GSTIN / Tax details"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="addressMaster">Address</Label>
+                    <Textarea
+                      id="addressMaster"
+                      value={customerDraft.address}
+                      onChange={(event) =>
+                        setCustomerDraft((prev) => ({ ...prev, address: event.target.value }))
+                      }
+                      placeholder="Street, city, state, PIN"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="notesMaster">Any Other Important Information</Label>
+                    <Textarea
+                      id="notesMaster"
+                      value={customerDraft.notes}
+                      onChange={(event) =>
+                        setCustomerDraft((prev) => ({ ...prev, notes: event.target.value }))
+                      }
+                      placeholder="Special terms, delivery notes, etc."
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCustomerDialogOpen(false)}>
-                Cancel
+                Close
               </Button>
-              <Button type="button" onClick={handleSaveCustomerMaster}>
-                {editingCustomerId ? 'Update Customer' : 'Save Customer'}
-              </Button>
+              {customerMasterMode === 'existing' && customerMasterSelection && editingCustomerId !== customerMasterSelection ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const selected = customerMaster.find((customer) => customer.id === customerMasterSelection);
+                      if (!selected) return;
+                      handleEditCustomer(selected);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      handleDeleteCustomer(customerMasterSelection);
+                      setCustomerMasterSelection('');
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </>
+              ) : null}
+              {(customerMasterMode === 'new' || (customerMasterMode === 'existing' && editingCustomerId === customerMasterSelection)) ? (
+                <Button type="button" onClick={handleSaveCustomerMaster}>
+                  {editingCustomerId ? 'Update Customer' : 'Save Customer'}
+                </Button>
+              ) : null}
             </DialogFooter>
           </DialogContent>
         </Dialog>
